@@ -6,7 +6,7 @@ import Html.Attributes exposing (..)
 import Url
 import Url.Parser exposing (Parser, parse, (</>), (<?>), int, map, oneOf, s, string)
 import Url.Parser.Query as Query
-
+import Array
 
 -- MAIN
 
@@ -36,11 +36,10 @@ type alias Model =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    case toRoute url of
-        Default parsedURL -> ( Model key url "", Cmd.none )
+    case urlParser url of
+        Default baseUrl params -> ( Model key url "", Cmd.none )
 
-        Authorized parsedURL auth -> ( Model key url (Maybe.withDefault "" auth), Cmd.none )
-
+        Authorized baseUrl params -> ( Model key url "", Cmd.none )
 
 -- UPDATE
 
@@ -61,9 +60,10 @@ update msg model =
           ( model, Nav.load href )
 
     UrlChanged url ->
-      ( { model | url = url }
-      , Cmd.none
-      )
+        case urlParser url of
+            Default baseUrl params -> ( { model | url = url }, Cmd.none )
+
+            Authorized baseUrl params -> ( { model | url = url }, Cmd.none )
 
 
 
@@ -79,10 +79,12 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-  { title = "URL Interceptor"
+  { title = "Test"
   , body =
       [ text "The current URL is: "
       , b [] [ text (Url.toString model.url) ]
+      , text "The query param: "
+      , b [] [ text model.auth ]
       , ul []
           [ viewLink "/home"
           , viewLink "/profile"
@@ -103,16 +105,39 @@ viewLink path =
 -- ROUTES 
 
 type Route
-  = Default String
-  | Authorized String (Maybe String)
+  = Default String (List UrlParam)
+  | Authorized String (List UrlParam)
 
-routeParser : Parser (Route -> a) a
-routeParser =
-  oneOf
-    [ Url.Parser.map Default string
-    , Url.Parser.map Authorized (string <?> Query.string "k")
-    ]
+type alias UrlParam =
+  { key : String
+  , value : String
+  }
+splitPair : String -> UrlParam
+splitPair s =
+    let
+        temp = Array.fromList (String.split "=" s)
+        key = Maybe.withDefault "" (Array.get 0 temp)
+        value = Maybe.withDefault "" (Array.get 1 temp)
+    in 
+        UrlParam key value
+containsAuth : UrlParam -> Bool
+containsAuth p = p.key == "auth"
 
-toRoute : Url.Url -> Route
-toRoute url = 
-    Maybe.withDefault (Default "view") (parse routeParser url)
+urlParser : Url.Url -> Route
+urlParser url =
+    let
+        temp = Array.fromList (String.split "?" (Url.toString url))
+        base = Maybe.withDefault "" (Array.get 0 temp)
+        params = Maybe.withDefault "" (Array.get 1 temp)
+        paramsList = List.map splitPair (String.split "&" params)
+    in
+        if List.any containsAuth paramsList then
+            Authorized base paramsList
+        else
+            Default base paramsList
+  -- if String.contains "?" (Url.toString url) the
+
+
+--toRoute : Url.Url -> Route
+--toRoute url = 
+    --Maybe.withDefault (Default "view") (parse routeParser url)

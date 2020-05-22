@@ -6,6 +6,7 @@ import Html.Attributes exposing (..)
 import Url
 import Array
 import Dict exposing (Dict)
+import Http
 
 -- MAIN
 
@@ -37,15 +38,21 @@ type alias Model =
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Default baseUrl params -> ( Model key url "" params, Cmd.none )
+        Default baseUrl params -> ( Model key url "" params, Nav.load
+            ("https://accounts.spotify.com/authorize"
+            ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
+            ++ "&redirect_uri=http:%2F%2Flocalhost:8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
+            ++ "&scope=user-read-private" -- this should change based on what we need, maybe user input?
+            ++ "&response_type=token") )
 
-        Authorized baseUrl params -> ( Model key url (Maybe.withDefault "" (Dict.get "auth" params) ) params, Cmd.none )
+        Authorized baseUrl params -> ( Model key url (Maybe.withDefault "" (Dict.get "access_token" params) ) params, Cmd.none )
 
 -- UPDATE
 
 type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
+  | Waiting (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -66,8 +73,9 @@ update msg model =
             Authorized baseUrl params -> ( { model |
                     url = url, 
                     params = params, 
-                    auth = Maybe.withDefault "" (Dict.get "auth" params)
+                    auth = Maybe.withDefault "" (Dict.get "access_token" params)
                 }, Cmd.none )
+    Waiting err -> (model, Cmd.none)
 
 
 
@@ -117,12 +125,12 @@ splitPair s =
         (key, value)
 
 containsAuth : (Dict String String) -> Bool
-containsAuth p = Dict.member "auth" p
+containsAuth p = Dict.member "access_token" p
 
 urlParser : Url.Url -> Route
 urlParser url =
     let
-        temp = Array.fromList (String.split "?" (Url.toString url))
+        temp = Array.fromList (String.split "#" (Url.toString url))
         base = Maybe.withDefault "" (Array.get 0 temp)
         params = Maybe.withDefault "" (Array.get 1 temp)
         paramsList =  Dict.fromList ( List.map splitPair (String.split "&" params) )

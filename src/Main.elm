@@ -7,6 +7,7 @@ import Url
 import Array
 import Dict exposing (Dict)
 import Http
+import Json.Decode exposing (..)
 
 -- MAIN
 
@@ -30,29 +31,46 @@ type alias Model =
   , url : Url.Url
   , auth : String
   , params : (Dict String String)
+  , topAlbums : LoadedAlbum
+  , errMsg : String
   }
 
+type LoadedAlbum
+    = NotLoaded 
+    | Loaded TopAlbumsResponse
 
 -- INIT 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Default baseUrl params -> ( Model key url "" params, Nav.load
+        Default baseUrl params -> ( Model key url "" params NotLoaded "", Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
-            ++ "&redirect_uri=http:%2F%2Flocalhost:8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
-            ++ "&scope=user-read-private" -- this should change based on what we need, maybe user input?
+            ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
+            ++ "&scope=user-top-read" -- this should change based on what we need, maybe user input?
             ++ "&response_type=token") )
 
-        Authorized baseUrl params -> ( Model key url (Maybe.withDefault "" (Dict.get "access_token" params) ) params, Cmd.none )
+        Authorized baseUrl params -> 
+            let
+                token = (Maybe.withDefault "" (Dict.get "access_token" params) )
+            in
+                ( Model key url token params NotLoaded "", Http.request { 
+                      method = "GET"
+                    , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                    , url = "https://api.spotify.com/v1/me/top/albums"
+                    , body = Http.emptyBody
+                    , expect = Http.expectJson GetAlbums topAlbumsResponseDecoder
+                    , timeout = Nothing
+                    , tracker = Nothing
+                    } )
 
 -- UPDATE
 
 type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
-  | Waiting (Result Http.Error ())
+  | GetAlbums (Result Http.Error TopAlbumsResponse)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -75,8 +93,17 @@ update msg model =
                     params = params, 
                     auth = Maybe.withDefault "" (Dict.get "access_token" params)
                 }, Cmd.none )
-    Waiting err -> (model, Cmd.none)
 
+    GetAlbums res -> 
+         case res of
+                Ok topAlbums -> ( { model | topAlbums = Loaded topAlbums } , Cmd.none)
+                Err errorMessage -> 
+                 case errorMessage of 
+                    Http.BadUrl x -> ( { model | errMsg = "badurl" ++ x } , Cmd.none)
+                    Http.Timeout -> ( { model | errMsg = "timout" } , Cmd.none)
+                    Http.NetworkError -> ( { model | errMsg = "networkerror" } , Cmd.none)
+                    Http.BadStatus x -> ( { model | errMsg = "badstatus" ++ String.fromInt x} , Cmd.none)
+                    Http.BadBody x -> ( { model | errMsg = "badbody"++x } , Cmd.none)
 
 
 -- SUBSCRIPTIONS
@@ -96,9 +123,10 @@ view model =
       [ text "The current URL is: "
       , b [] [ text (Url.toString model.url) ]
       , p [] [ text "The auth key: ", b [] [ text model.auth] ]
-      , ul []
-          [ viewLink "/test"
-          ]
+      , case model.topAlbums of
+            Loaded albums -> ul [] (topAlbumsToImages albums)
+            NotLoaded -> text "NOT LOADED"
+      , p [] [ text "Error: ", b [] [ text model.errMsg] ]
       ]
   }
 
@@ -107,8 +135,15 @@ viewLink : String -> Html msg
 viewLink path =
   li [] [ a [ href path ] [ text path ] ]
 
+displayImg : String -> Html msg
+displayImg url = img [ src url ] []
 
-
+topAlbumsToImages : TopAlbumsResponse -> List (Html msg)
+topAlbumsToImages res =
+    let
+        firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.images) ) res.items 
+    in
+        List.map (\a -> displayImg a.url) firstArts
 -- ROUTES 
 
 type Route
@@ -145,3 +180,32 @@ urlParser url =
 --toRoute : Url.Url -> Route
 --toRoute url = 
     --Maybe.withDefault (Default "view") (parse routeParser url)
+
+
+-- Decode Song Response 
+type alias TopAlbumsResponse =  { items: List Album}
+type alias Album =
+  { name : String
+  , images : List AlbumArt
+  }
+type alias AlbumArt =
+  { --height : Int
+ -- , width : Int
+  url : String
+  }
+
+topAlbumsResponseDecoder : Decoder TopAlbumsResponse
+topAlbumsResponseDecoder =
+  Json.Decode.map TopAlbumsResponse
+      (field "items" (Json.Decode.list albumsDecoder))
+
+albumsDecoder : Decoder Album
+albumsDecoder =
+  Json.Decode.map2 Album
+    (field "name" string)
+    (field "images" (Json.Decode.list albumArtDecoder))
+
+albumArtDecoder : Decoder AlbumArt
+albumArtDecoder = 
+    Json.Decode.map AlbumArt
+      (field "url" string)

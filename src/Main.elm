@@ -58,7 +58,7 @@ init flags url key =
                 ( Model key url token params NotLoaded "", Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                    , url = "https://api.spotify.com/v1/me/top/albums"
+                    , url = "https://api.spotify.com/v1/me/top/artists/?time_range=long_term&limit=50"
                     , body = Http.emptyBody
                     , expect = Http.expectJson GetAlbums topAlbumsResponseDecoder
                     , timeout = Nothing
@@ -102,7 +102,7 @@ update msg model =
                     Http.BadUrl x -> ( { model | errMsg = "badurl" ++ x } , Cmd.none)
                     Http.Timeout -> ( { model | errMsg = "timout" } , Cmd.none)
                     Http.NetworkError -> ( { model | errMsg = "networkerror" } , Cmd.none)
-                    Http.BadStatus x -> ( { model | errMsg = "badstatus" ++ String.fromInt x} , Cmd.none)
+                    Http.BadStatus x -> ( { model | errMsg = "badstatus" ++ String.fromInt x } , Cmd.none)
                     Http.BadBody x -> ( { model | errMsg = "badbody"++x } , Cmd.none)
 
 
@@ -136,7 +136,7 @@ viewLink path =
   li [] [ a [ href path ] [ text path ] ]
 
 displayImg : String -> Html msg
-displayImg url = img [ src url ] []
+displayImg url =  img [ src url, style "width" "200px", style "height" "200px" ] []
 
 topAlbumsToImages : TopAlbumsResponse -> List (Html msg)
 topAlbumsToImages res =

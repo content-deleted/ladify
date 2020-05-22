@@ -4,9 +4,8 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Url
-import Url.Parser exposing (Parser, parse, (</>), (<?>), int, map, oneOf, s, string)
-import Url.Parser.Query as Query
 import Array
+import Dict exposing (Dict)
 
 -- MAIN
 
@@ -29,6 +28,7 @@ type alias Model =
   { key : Nav.Key
   , url : Url.Url
   , auth : String
+  , params : (Dict String String)
   }
 
 
@@ -37,9 +37,9 @@ type alias Model =
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Default baseUrl params -> ( Model key url "", Cmd.none )
+        Default baseUrl params -> ( Model key url "" params, Cmd.none )
 
-        Authorized baseUrl params -> ( Model key url "", Cmd.none )
+        Authorized baseUrl params -> ( Model key url (Maybe.withDefault "" (Dict.get "auth" params) ) params, Cmd.none )
 
 -- UPDATE
 
@@ -61,9 +61,13 @@ update msg model =
 
     UrlChanged url ->
         case urlParser url of
-            Default baseUrl params -> ( { model | url = url }, Cmd.none )
+            Default baseUrl params -> ( { model | url = url, params = params}, Cmd.none )
 
-            Authorized baseUrl params -> ( { model | url = url }, Cmd.none )
+            Authorized baseUrl params -> ( { model |
+                    url = url, 
+                    params = params, 
+                    auth = Maybe.withDefault "" (Dict.get "auth" params)
+                }, Cmd.none )
 
 
 
@@ -83,14 +87,9 @@ view model =
   , body =
       [ text "The current URL is: "
       , b [] [ text (Url.toString model.url) ]
-      , text "The query param: "
-      , b [] [ text model.auth ]
+      , p [] [ text "The auth key: ", b [] [ text model.auth] ]
       , ul []
-          [ viewLink "/home"
-          , viewLink "/profile"
-          , viewLink "/reviews/the-century-of-the-self"
-          , viewLink "/reviews/public-opinion"
-          , viewLink "/reviews/shah-of-shahs"
+          [ viewLink "/test"
           ]
       ]
   }
@@ -105,23 +104,20 @@ viewLink path =
 -- ROUTES 
 
 type Route
-  = Default String (List UrlParam)
-  | Authorized String (List UrlParam)
+  = Default String (Dict String String)
+  | Authorized String (Dict String String)
 
-type alias UrlParam =
-  { key : String
-  , value : String
-  }
-splitPair : String -> UrlParam
+splitPair : String -> (String, String)
 splitPair s =
     let
         temp = Array.fromList (String.split "=" s)
         key = Maybe.withDefault "" (Array.get 0 temp)
         value = Maybe.withDefault "" (Array.get 1 temp)
     in 
-        UrlParam key value
-containsAuth : UrlParam -> Bool
-containsAuth p = p.key == "auth"
+        (key, value)
+
+containsAuth : (Dict String String) -> Bool
+containsAuth p = Dict.member "auth" p
 
 urlParser : Url.Url -> Route
 urlParser url =
@@ -129,9 +125,9 @@ urlParser url =
         temp = Array.fromList (String.split "?" (Url.toString url))
         base = Maybe.withDefault "" (Array.get 0 temp)
         params = Maybe.withDefault "" (Array.get 1 temp)
-        paramsList = List.map splitPair (String.split "&" params)
+        paramsList =  Dict.fromList ( List.map splitPair (String.split "&" params) )
     in
-        if List.any containsAuth paramsList then
+        if containsAuth paramsList then
             Authorized base paramsList
         else
             Default base paramsList

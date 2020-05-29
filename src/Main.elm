@@ -37,7 +37,7 @@ type alias Model =
 
 type LoadedAlbum
     = NotLoaded 
-    | Loaded TopAlbumsResponse
+    | Loaded TopTrackResponse
 
 -- INIT 
 
@@ -58,9 +58,9 @@ init flags url key =
                 ( Model key url token params NotLoaded "", Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                    , url = "https://api.spotify.com/v1/me/top/artists/?time_range=long_term&limit=50"
+                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
                     , body = Http.emptyBody
-                    , expect = Http.expectJson GetAlbums topAlbumsResponseDecoder
+                    , expect = Http.expectJson GetAlbums topTrackResponseDecoder
                     , timeout = Nothing
                     , tracker = Nothing
                     } )
@@ -70,7 +70,7 @@ init flags url key =
 type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
-  | GetAlbums (Result Http.Error TopAlbumsResponse)
+  | GetAlbums (Result Http.Error TopTrackResponse)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -124,7 +124,7 @@ view model =
       , b [] [ text (Url.toString model.url) ]
       , p [] [ text "The auth key: ", b [] [ text model.auth] ]
       , case model.topAlbums of
-            Loaded albums -> ul [] (topAlbumsToImages albums)
+            Loaded albums -> ul [] (topTracksToImages albums)
             NotLoaded -> text "NOT LOADED"
       , p [] [ text "Error: ", b [] [ text model.errMsg] ]
       ]
@@ -144,6 +144,14 @@ topAlbumsToImages res =
         firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.images) ) res.items 
     in
         List.map (\a -> displayImg a.url) firstArts
+
+topTracksToImages : TopTrackResponse -> List (Html msg)
+topTracksToImages res =
+    let
+        firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.album.images) ) res.items 
+    in
+        List.map (\a -> displayImg a.url) firstArts
+
 -- ROUTES 
 
 type Route
@@ -184,6 +192,12 @@ urlParser url =
 
 -- Decode Song Response 
 type alias TopAlbumsResponse =  { items: List Album}
+type alias TopTrackResponse =  { items: List Track}
+
+type alias Track =
+  { name : String
+  , album : Album
+  }
 type alias Album =
   { name : String
   , images : List AlbumArt
@@ -198,6 +212,17 @@ topAlbumsResponseDecoder : Decoder TopAlbumsResponse
 topAlbumsResponseDecoder =
   Json.Decode.map TopAlbumsResponse
       (field "items" (Json.Decode.list albumsDecoder))
+
+topTrackResponseDecoder : Decoder TopTrackResponse
+topTrackResponseDecoder =
+  Json.Decode.map TopTrackResponse
+      (field "items" (Json.Decode.list tracksDecoder))
+
+tracksDecoder : Decoder Track
+tracksDecoder =
+  Json.Decode.map2 Track
+    (field "name" string)
+    (field "album" albumsDecoder)
 
 albumsDecoder : Decoder Album
 albumsDecoder =

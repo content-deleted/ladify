@@ -97,13 +97,7 @@ update msg model =
     GetAlbums res -> 
          case res of
                 Ok topAlbums -> ( { model | topAlbums = Loaded topAlbums } , Cmd.none)
-                Err errorMessage -> 
-                 case errorMessage of 
-                    Http.BadUrl x -> ( { model | errMsg = "badurl" ++ x } , Cmd.none)
-                    Http.Timeout -> ( { model | errMsg = "timout" } , Cmd.none)
-                    Http.NetworkError -> ( { model | errMsg = "networkerror" } , Cmd.none)
-                    Http.BadStatus x -> ( { model | errMsg = "badstatus" ++ String.fromInt x } , Cmd.none)
-                    Http.BadBody x -> ( { model | errMsg = "badbody"++x } , Cmd.none)
+                Err errorMessage -> ( { model | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
 
 
 -- SUBSCRIPTIONS
@@ -189,6 +183,15 @@ urlParser url =
 --toRoute url = 
     --Maybe.withDefault (Default "view") (parse routeParser url)
 
+-- Error handling 
+htmlErrorToString : Http.Error -> String
+htmlErrorToString error = 
+    case error of 
+        Http.BadUrl x -> "badurl" ++ x 
+        Http.Timeout -> "timout"
+        Http.NetworkError -> "networkerror"
+        Http.BadStatus x -> "badstatus" ++ String.fromInt x
+        Http.BadBody x -> "badbody"++ x
 
 -- Decode Song Response 
 type alias TopAlbumsResponse =  { items: List Album}

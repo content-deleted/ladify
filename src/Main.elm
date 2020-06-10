@@ -8,6 +8,7 @@ import Array
 import Dict exposing (Dict)
 import Http
 import Json.Decode exposing (..)
+import Stat exposing (..)
 
 -- MAIN
 
@@ -27,6 +28,11 @@ main =
 -- MODEL
 
 type alias Model =
+  { global : GlobalModel
+  , stats : Stat.Model
+  }
+
+type alias GlobalModel = 
   { key : Nav.Key
   , url : Url.Url
   , auth : String

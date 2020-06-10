@@ -9,6 +9,8 @@ import Dict exposing (Dict)
 import Http
 import Json.Decode exposing (..)
 import Stat exposing (..)
+import Global exposing (..)
+import Stats.GenreGraph exposing (Model)
 
 -- MAIN
 
@@ -24,33 +26,21 @@ main =
     }
 
 
-
--- MODEL
-
+-- Model
 type alias Model =
-  { global : GlobalModel
-  , stats : Stat.Model
+  { global : Global.Global
+  , stats : List Stat.Stat
   }
 
-type alias GlobalModel = 
-  { key : Nav.Key
-  , url : Url.Url
-  , auth : String
-  , params : (Dict String String)
-  , topAlbums : LoadedAlbum
-  , errMsg : String
-  }
-
-type LoadedAlbum
-    = NotLoaded 
-    | Loaded TopTrackResponse
+updateGlobal : Model -> Global.Global -> Model
+updateGlobal model global = { model | global = global }
 
 -- INIT 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Default baseUrl params -> ( Model key url "" params NotLoaded "", Nav.load
+        Default  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse [])) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -61,49 +51,45 @@ init flags url key =
             let
                 token = (Maybe.withDefault "" (Dict.get "access_token" params) )
             in
-                ( Model key url token params NotLoaded "", Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse [])) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
                     , body = Http.emptyBody
-                    , expect = Http.expectJson GetAlbums topTrackResponseDecoder
+                    , expect = Http.expectJson GetTracks topTrackResponseDecoder
                     , timeout = Nothing
                     , tracker = Nothing
                     } )
 
 -- UPDATE
 
-type Msg
-  = LinkClicked Browser.UrlRequest
-  | UrlChanged Url.Url
-  | GetAlbums (Result Http.Error TopTrackResponse)
 
-
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
+  let global = model.global in
   case msg of
     LinkClicked urlRequest ->
       case urlRequest of
         Browser.Internal url ->
-          ( model, Nav.pushUrl model.key (Url.toString url) )
+          ( model, Nav.pushUrl model.global.key (Url.toString url) )
 
         Browser.External href ->
           ( model, Nav.load href )
 
     UrlChanged url ->
         case urlParser url of
-            Default baseUrl params -> ( { model | url = url, params = params}, Cmd.none )
+            Default baseUrl params -> ( updateGlobal model { global |  url = url, params = params}, Cmd.none )
 
-            Authorized baseUrl params -> ( { model |
+            Authorized baseUrl params -> ( updateGlobal model { global |
                     url = url, 
                     params = params, 
                     auth = Maybe.withDefault "" (Dict.get "access_token" params)
                 }, Cmd.none )
 
-    GetAlbums res -> 
+    GetTracks res -> 
          case res of
-                Ok topAlbums -> ( { model | topAlbums = Loaded topAlbums } , Cmd.none)
-                Err errorMessage -> ( { model | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
+                Ok topTracks -> ( updateGlobal model { global | topTracks = topTracks } , Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
 
 
 -- SUBSCRIPTIONS
@@ -117,35 +103,36 @@ subscriptions _ =
 -- VIEW
 
 view : Model -> Browser.Document Msg
-view model =
+view m =
+  let model = m.global in
   { title = "Test"
   , body =
       [ text "The current URL is: "
       , b [] [ text (Url.toString model.url) ]
       , p [] [ text "The auth key: ", b [] [ text model.auth] ]
-      , case model.topAlbums of
-            Loaded albums -> ul [] (topTracksToImages albums)
-            NotLoaded -> text "NOT LOADED"
+      , if List.isEmpty model.topTracks.items
+            then text "NOT LOADED"
+            else ul [] (topTracksToImages model.topTracks)
       , p [] [ text "Error: ", b [] [ text model.errMsg] ]
       ]
   }
 
 
-viewLink : String -> Html msg
+viewLink : String -> Html Msg
 viewLink path =
   li [] [ a [ href path ] [ text path ] ]
 
-displayImg : String -> Html msg
+displayImg : String -> Html Msg
 displayImg url =  img [ src url, style "width" "200px", style "height" "200px" ] []
 
-topAlbumsToImages : TopAlbumsResponse -> List (Html msg)
+topAlbumsToImages : TopAlbumsResponse -> List (Html Msg)
 topAlbumsToImages res =
     let
         firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.images) ) res.items 
     in
         List.map (\a -> displayImg a.url) firstArts
 
-topTracksToImages : TopTrackResponse -> List (Html msg)
+topTracksToImages : TopTrackResponse -> List (Html Msg)
 topTracksToImages res =
     let
         firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.album.images) ) res.items 
@@ -198,48 +185,3 @@ htmlErrorToString error =
         Http.NetworkError -> "networkerror"
         Http.BadStatus x -> "badstatus" ++ String.fromInt x
         Http.BadBody x -> "badbody"++ x
-
--- Decode Song Response 
-type alias TopAlbumsResponse =  { items: List Album}
-type alias TopTrackResponse =  { items: List Track}
-
-type alias Track =
-  { name : String
-  , album : Album
-  }
-type alias Album =
-  { name : String
-  , images : List AlbumArt
-  }
-type alias AlbumArt =
-  { --height : Int
- -- , width : Int
-  url : String
-  }
-
-topAlbumsResponseDecoder : Decoder TopAlbumsResponse
-topAlbumsResponseDecoder =
-  Json.Decode.map TopAlbumsResponse
-      (field "items" (Json.Decode.list albumsDecoder))
-
-topTrackResponseDecoder : Decoder TopTrackResponse
-topTrackResponseDecoder =
-  Json.Decode.map TopTrackResponse
-      (field "items" (Json.Decode.list tracksDecoder))
-
-tracksDecoder : Decoder Track
-tracksDecoder =
-  Json.Decode.map2 Track
-    (field "name" string)
-    (field "album" albumsDecoder)
-
-albumsDecoder : Decoder Album
-albumsDecoder =
-  Json.Decode.map2 Album
-    (field "name" string)
-    (field "images" (Json.Decode.list albumArtDecoder))
-
-albumArtDecoder : Decoder AlbumArt
-albumArtDecoder = 
-    Json.Decode.map AlbumArt
-      (field "url" string)

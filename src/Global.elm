@@ -30,15 +30,25 @@ type alias TopTrackResponse =  { items: List Track}
 type alias Track =
   { name : String
   , album : Album
+  , artists : List SimpleArtist
+  , popularity : Int
+  , preview_url : String
+  , explicit : Bool
   }
 type alias Album =
   { name : String
+  , release_date : String
   , images : List AlbumArt
   }
 type alias AlbumArt =
-  { --height : Int
- -- , width : Int
-  url : String
+  { url : String
+  , height : Int
+  , width : Int
+  }
+
+type alias SimpleArtist =
+  { name : String
+  , uri : String
   }
 
 topAlbumsResponseDecoder : Decoder TopAlbumsResponse
@@ -53,17 +63,31 @@ topTrackResponseDecoder =
 
 tracksDecoder : Decoder Track
 tracksDecoder =
-  Json.Decode.map2 Track
+  Json.Decode.map6 Track
     (field "name" string)
     (field "album" albumsDecoder)
+    (field "artists" (Json.Decode.list artistDecoder))
+    (field "popularity" int)
+    (field "preview_url" string)
+    (field "explicit" bool)
 
 albumsDecoder : Decoder Album
 albumsDecoder =
-  Json.Decode.map2 Album
+  Json.Decode.map3 Album
     (field "name" string)
+    (field "year" string)
     (field "images" (Json.Decode.list albumArtDecoder))
 
 albumArtDecoder : Decoder AlbumArt
 albumArtDecoder = 
-    Json.Decode.map AlbumArt
+    Json.Decode.map3 AlbumArt
       (field "url" string)
+      (field "width" int)
+      (field "height" int)
+
+
+artistDecoder : Decoder SimpleArtist
+artistDecoder =
+  Json.Decode.map2 SimpleArtist
+    (field "name" string)
+    (field "uri" string)

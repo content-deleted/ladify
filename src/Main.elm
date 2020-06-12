@@ -54,7 +54,7 @@ init flags url key =
                 ( Model (Global.Global key url token params "" (TopTrackResponse [])) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
+                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=short_term&limit=50"
                     , body = Http.emptyBody
                     , expect = Http.expectJson GetTracks topTrackResponseDecoder
                     , timeout = Nothing
@@ -66,30 +66,31 @@ init flags url key =
 
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
-  let global = model.global in
-  case msg of
-    LinkClicked urlRequest ->
-      case urlRequest of
-        Browser.Internal url ->
-          ( model, Nav.pushUrl model.global.key (Url.toString url) )
+  let 
+    global = model.global 
+    stats = model.stats
+  in
+    case msg of
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->  ( model, Nav.pushUrl model.global.key (Url.toString url) )
 
-        Browser.External href ->
-          ( model, Nav.load href )
+                Browser.External href -> ( model, Nav.load href )
 
-    UrlChanged url ->
-        case urlParser url of
-            Default baseUrl params -> ( updateGlobal model { global |  url = url, params = params}, Cmd.none )
+        UrlChanged url ->
+            case urlParser url of
+                Default baseUrl params -> ( updateGlobal model { global |  url = url, params = params}, Cmd.none )
 
-            Authorized baseUrl params -> ( updateGlobal model { global |
-                    url = url, 
-                    params = params, 
-                    auth = Maybe.withDefault "" (Dict.get "access_token" params)
-                }, Cmd.none )
+                Authorized baseUrl params -> ( updateGlobal model { global |
+                        url = url, 
+                        params = params, 
+                        auth = Maybe.withDefault "" (Dict.get "access_token" params)
+                    }, Cmd.none )
 
-    GetTracks res -> 
-         case res of
-                Ok topTracks -> ( updateGlobal model { global | topTracks = topTracks } , Cmd.none)
-                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
+        GetTracks res -> 
+            case res of
+                    Ok topTracks -> ( { model | global = { global | topTracks = topTracks }, stats = Stat.init } , Cmd.none)
+                    Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
 
 
 -- SUBSCRIPTIONS
@@ -103,20 +104,29 @@ subscriptions _ =
 -- VIEW
 
 view : Model -> Browser.Document Msg
-view m =
-  let model = m.global in
-  { title = "Test"
-  , body =
-      [ text "The current URL is: "
-      , b [] [ text (Url.toString model.url) ]
-      , p [] [ text "The auth key: ", b [] [ text model.auth] ]
-      , if List.isEmpty model.topTracks.items
-            then text "NOT LOADED"
-            else ul [] (topTracksToImages model.topTracks)
-      , p [] [ text "Error: ", b [] [ text model.errMsg] ]
-      ]
-  }
+view model =
+  let 
+    global = model.global
+    stats = model.stats
+  in
+    { title = "Test"
+    , body =
+        [ 
+          Stat.view global stats
+          , p [] 
+            [ b [] [ text "DEBUG INFO: " ]
+            , p [] [ text "The current URL is: " ]
+            , b [] [ text (Url.toString global.url) ]
+            , p [] [ text "The auth key: ", b [] [ text global.auth] ]
+            , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+            ]
+        ]
+    }
 
+-- old images code
+-- if List.isEmpty model.topTracks.items
+-- then text "NOT LOADED"
+-- else ul [] (topTracksToImages model.topTracks)
 
 viewLink : String -> Html Msg
 viewLink path =
@@ -125,6 +135,8 @@ viewLink path =
 displayImg : String -> Html Msg
 displayImg url =  img [ src url, style "width" "200px", style "height" "200px" ] []
 
+-- IDK WHY THIS ISNT WORKING
+{-
 topAlbumsToImages : TopAlbumsResponse -> List (Html Msg)
 topAlbumsToImages res =
     let
@@ -138,7 +150,7 @@ topTracksToImages res =
         firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.album.images) ) res.items 
     in
         List.map (\a -> displayImg a.url) firstArts
-
+-}
 -- ROUTES 
 
 type Route

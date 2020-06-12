@@ -68,14 +68,14 @@ tracksDecoder =
     (field "album" albumsDecoder)
     (field "artists" (Json.Decode.list artistDecoder))
     (field "popularity" int)
-    (field "preview_url" string)
+    (field "preview_url" (oneOf [ string, null "EMPTY" ]) )
     (field "explicit" bool)
 
 albumsDecoder : Decoder Album
 albumsDecoder =
   Json.Decode.map3 Album
     (field "name" string)
-    (field "year" string)
+    (field "release_date" string)
     (field "images" (Json.Decode.list albumArtDecoder))
 
 albumArtDecoder : Decoder AlbumArt

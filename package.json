@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "del": "^2.1.0",
+    "gulp": "^3.9.0",
+    "gulp-elm": "^0.8.2",
+    "gulp-plumber": "^1.0.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-connect": "^5.7.0",
+    "gulp-open": "^3.0.1"
+  },
+  "scripts": {
+    "dev": "gulp clean && gulp dev && gulp devHTML",
+    "build": "gulp clean && gulp build",
+    "watch": "gulp devHTML"
+  }
+}

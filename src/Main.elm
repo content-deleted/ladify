@@ -43,7 +43,7 @@ init flags url key =
         Default  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse [])) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
-            ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
+            ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8001%2FMain.html" -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
             ++ "&scope=user-top-read" -- this should change based on what we need, maybe user input?
             ++ "&response_type=token") )
 

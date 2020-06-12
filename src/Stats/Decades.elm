@@ -5,7 +5,13 @@ import Html.Attributes exposing (..)
 
 view : Global -> Html msg
 view global = 
-  ul [] (List.map printNameAndYear global.topTracks.items)
+  dl [] 
+    [ dt [ class "test" ] [text "Test new"]
+    , dd []
+      [ span [] [text "test data"]
+      ] 
+    ]
+  --ul [] (List.map printNameAndYear global.topTracks.items)
 
 printNameAndYear : Track -> Html msg
 printNameAndYear track =

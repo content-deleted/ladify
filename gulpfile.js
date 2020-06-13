@@ -92,4 +92,4 @@ gulp.task('watchHTML', function () {
 });
 
 // Pipe for everything we need for server
-gulp.task('devHTML', ['connect', 'open', 'watchHTML']);
+gulp.task('devHTML', ['connect']);

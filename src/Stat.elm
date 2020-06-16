@@ -25,7 +25,9 @@ view : Global -> List Stat -> Html msg
 view global stats = 
     if List.isEmpty global.topTracks.items
         then text "NOT LOADED"
-        else ul [] ( List.map (renderStat global) stats )
+        else div [ class "stat-list" ] [ 
+            ul [] ( List.map (renderStat global) stats )
+        ]
 
 
 renderStat : Global -> Stat -> Html msg

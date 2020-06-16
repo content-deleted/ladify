@@ -54,7 +54,7 @@ init flags url key =
                 ( Model (Global.Global key url token params "" (TopTrackResponse [])) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=short_term&limit=50"
+                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
                     , body = Http.emptyBody
                     , expect = Http.expectJson GetTracks topTrackResponseDecoder
                     , timeout = Nothing
@@ -111,8 +111,8 @@ view model =
   in
     { title = "Test"
     , body =
-        [ 
-          Stat.view global stats
+        [ div [ class "main" ]
+          [ Stat.view global stats
           , p [] 
             [ b [] [ text "DEBUG INFO: " ]
             , p [] [ text "The current URL is: " ]
@@ -120,6 +120,7 @@ view model =
             , p [] [ text "The auth key: ", b [] [ text global.auth] ]
             , p [] [ text "Error: ", b [] [ text global.errMsg] ]
             ]
+          ]
         ]
     }
 

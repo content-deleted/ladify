@@ -7,7 +7,6 @@ import Json.Encode exposing (string)
 import Result exposing (Result)
 import Maybe exposing (Maybe)
 import Array exposing (indexedMap)
-import Json.Encode exposing (int)
 
 view : Global -> Html msg
 view global = 
@@ -39,7 +38,7 @@ generateBars tracks =
     Array.toList (indexedMap (\i count -> drawBar (1930 + i * 10) count ) result )
 
 dropIn : String -> Array.Array Int -> Array.Array Int
-dropIn = (\year current -> Array.set (getBucket year) ((Array.get (getBucket year) current |> Maybe.withDefault 0) + 10) current ) 
+dropIn year current = Array.set (getBucket year) ((Array.get (getBucket year) current |> Maybe.withDefault 0) + 10) current
 
 drawBar : Int -> Int -> Html msg
 drawBar decade count = dd [ class "bar", style "height" (String.fromInt count ++ "px") ]

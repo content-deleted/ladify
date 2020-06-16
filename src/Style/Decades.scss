@@ -88,12 +88,12 @@ dt {
 }
 .bar {
   width: 80px;
-  margin: 8px;
+  margin: 6px;
   display: inline-block;
   position: relative;
   background-color: #186933;
   align-self: flex-end;
-  top: -10px;
+  top: -15px;
 }
 .label {
   position: relative;
@@ -101,4 +101,5 @@ dt {
 }
 .title {
     position: absolute;
+    font-size: x-large;
   }

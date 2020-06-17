@@ -10,15 +10,20 @@ import Array exposing (indexedMap)
 
 view : Global -> Html msg
 view global = 
-  let years = List.map getYear global.topTracks.items
+  let tracks = global.topTracks.items
   in 
     div [] [
       dl [ class "graph" ] 
-      (List.concat [ [ dt [ class "title" ] [text "Top Tracks by Decade"] ] 
-        , generateBars global.topTracks.items ] )
+      (List.concat [ 
+          [ dt [ class "title" ] [text "Top Tracks by Decade"] ], 
+          generateBars tracks 
+        ] )
       -- , ul [] (List.map printNameAndYear global.topTracks.items)
       -- , ul [] (List.map (\y -> text (y ++ " ") )  years) 
       -- , ul [] (List.map (\y -> text (String.fromInt (getBucket y)  ++ " ") )  years)
+      , text ( "Your average popularity: " ++ String.fromInt (List.foldl (\x res -> res + x.popularity) 0 tracks // 50 ) )
+      , text ( "Your lowest popularity: " ++  String.fromInt (List.foldl (\x res -> if x.popularity < res then x.popularity else res ) 100 tracks ) )
+      , ul [] (List.map (\x -> text (String.fromInt x.popularity ++ " ") ) global.topTracks.items)
     ]
     --ul [] (List.map printNameAndYear global.topTracks.items)
 

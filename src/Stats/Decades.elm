@@ -27,10 +27,6 @@ view global =
     ]
     --ul [] (List.map printNameAndYear global.topTracks.items)
 
-printNameAndYear : Track -> Html msg
-printNameAndYear track =
-  text (track.album.name ++ "-" ++ track.album.release_date ++ " ")
-
 -- generate one bar for each of the last 10 decades
 -- place the tracks into decade buckets and count
 generateBars : (List Track) -> List (Html msg)

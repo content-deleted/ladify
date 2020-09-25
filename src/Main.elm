@@ -10,7 +10,6 @@ import Http
 import Json.Decode exposing (..)
 import Stat exposing (..)
 import Global exposing (..)
-import Stats.GenreGraph exposing (Model)
 
 -- MAIN
 
@@ -49,7 +48,7 @@ init flags url key =
 
         Authorized baseUrl params -> 
             let
-                token = (Maybe.withDefault "" (Dict.get "access_token" params) )
+                token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
                 ( Model (Global.Global key url token params "" (TopTrackResponse [])) [], Http.request { 
                       method = "GET"
@@ -133,9 +132,6 @@ viewLink : String -> Html Msg
 viewLink path =
   li [] [ a [ href path ] [ text path ] ]
 
-displayImg : String -> Html Msg
-displayImg url =  img [ src url, style "width" "200px", style "height" "200px" ] []
-
 -- IDK WHY THIS ISNT WORKING
 {-
 topAlbumsToImages : TopAlbumsResponse -> List (Html Msg)
@@ -182,12 +178,6 @@ urlParser url =
             Authorized base paramsList
         else
             Default base paramsList
-  -- if String.contains "?" (Url.toString url) the
-
-
---toRoute : Url.Url -> Route
---toRoute url = 
-    --Maybe.withDefault (Default "view") (parse routeParser url)
 
 -- Error handling 
 htmlErrorToString : Http.Error -> String

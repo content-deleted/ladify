@@ -4,8 +4,8 @@ import WebGL.Texture as Texture exposing (Texture, defaultOptions, Error)
 import Math.Matrix4 as Mat4 exposing (Mat4)
 import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 import Math.Vector3 as Vec3 exposing (Vec3, vec3)
-import Html exposing (Html, text)
-import Html.Attributes exposing (height, style, width)
+import Html exposing (..)
+import Html.Attributes exposing (..)
 
 -- MODEL 
 -- Lets update this to be a little cleaner 
@@ -16,18 +16,20 @@ type alias Model =
 
 -- View
 view : Model -> Html msg
-view { x, y } =
+view { x, y } = 
+  div [class "genre-wrapper"] [
     WebGL.toHtml
-        [ width 500
-        , height 500
-        , style "display" "block"
-        , style "position" "absolute"
-        , style "left" "0"
-        , style "top" "0"
-        ]
-        [ toEntity faceMesh
-        , toEntity sidesMesh
-        ]
+      [ width 500
+      , height 500
+      , style "display" "block"
+      , style "position" "absolute"
+      , style "left" "0"
+      , style "top" "0"
+      ]
+      [ toEntity faceMesh
+      , toEntity sidesMesh
+      ]
+  ]
 
 
 -- Mesh

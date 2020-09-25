@@ -1,6 +1,7 @@
 module Stat exposing (..)
 import Stats.GenreGraph exposing (..)
 import Stats.Decades exposing (..)
+import Stats.Grid exposing (..)
 import Global exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -20,9 +21,10 @@ type Stat
     = GenreGraph Stats.GenreGraph.Model
     | TrackPopularity
     | Decades
+    | Grid
 
 init : List Stat
-init = [ Decades, GenreGraph { x = 0, y = 0 } ]
+init = [ Decades, GenreGraph { x = 0, y = 0 }, Grid ]
 
 view : Global -> List Stat -> Html msg
 view global stats = 
@@ -40,4 +42,5 @@ renderStat global stat =
             GenreGraph model -> Stats.GenreGraph.view model
             TrackPopularity -> text "not impemented"
             Decades ->  Stats.Decades.view global
+            Grid -> Stats.Grid.view global
     ]

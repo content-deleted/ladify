@@ -39,21 +39,35 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Default  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse [])) [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) ) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8001%2FMain.html" -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
             ++ "&scope=user-top-read" -- this should change based on what we need, maybe user input?
             ++ "&response_type=token") )
 
-        Authorized baseUrl params -> 
+        StatDisplay baseUrl params -> 
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse [])) [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params)) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
+                    , body = Http.emptyBody
+                    , expect = Http.expectJson GetTracks topTrackResponseDecoder
+                    , timeout = Nothing
+                    , tracker = Nothing
+                    } )
+    
+        PlaylistEdit baseUrl params -> 
+            let
+                token = Maybe.withDefault "" (Dict.get "access_token" params)
+            in
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params)) [], Http.request { 
+                      method = "GET"
+                    , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                    , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50" -- Request All User albums (Continue until we load all)
                     , body = Http.emptyBody
                     , expect = Http.expectJson GetTracks topTrackResponseDecoder
                     , timeout = Nothing
@@ -78,12 +92,20 @@ update msg model =
 
         UrlChanged url ->
             case urlParser url of
-                Default baseUrl params -> ( updateGlobal model { global |  url = url, params = params}, Cmd.none )
+                Unauthorized baseUrl params -> ( updateGlobal model { global |  url = url, params = params, currentRoute = (Unauthorized baseUrl params)}, Cmd.none )
 
-                Authorized baseUrl params -> ( updateGlobal model { global |
+                StatDisplay baseUrl params -> ( updateGlobal model { global |
                         url = url, 
                         params = params, 
-                        auth = Maybe.withDefault "" (Dict.get "access_token" params)
+                        auth = Maybe.withDefault "" (Dict.get "access_token" params),
+                        currentRoute = (StatDisplay baseUrl params)
+                    }, Cmd.none )
+                
+                PlaylistEdit baseUrl params -> ( updateGlobal model { global |
+                        url = url, 
+                        params = params, 
+                        auth = Maybe.withDefault "" (Dict.get "access_token" params),
+                        currentRoute = (PlaylistEdit baseUrl params)
                     }, Cmd.none )
 
         GetTracks res -> 
@@ -108,20 +130,43 @@ view model =
     global = model.global
     stats = model.stats
   in
-    { title = "Test"
-    , body =
-        [ div [ class "main" ]
-          [ Stat.view global stats
-          , p [] 
-            [ b [] [ text "DEBUG INFO: " ]
-            , p [] [ text "The current URL is: " ]
-            , b [] [ text (Url.toString global.url) ]
-            , p [] [ text "The auth key: ", b [] [ text global.auth] ]
-            , p [] [ text "Error: ", b [] [ text global.errMsg] ]
-            ]
-          ]
-        ]
-    }
+  -- MOVE THESE OUT TO DIFFERENT FILES
+    case global.currentRoute of  
+        StatDisplay _ _ -> { title = "LADIFY"
+            , body =
+                [ div [ class "main" ]
+                    [ Stat.view global stats
+                    , p [] 
+                    [ b [] [ text "DEBUG INFO: " ]
+                    , p [] [ text "The current URL is: " ]
+                    , b [] [ text (Url.toString global.url) ]
+                    , p [] [ text "The auth key: ", b [] [ text global.auth] ]
+                    , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+                    ]
+                    ]
+                ]
+            }
+        PlaylistEdit _ _ -> { title = "Playlist Edit"
+            , body =
+                [ div [ class "main" ]
+                    [ -- Stat.view global stats
+                    p []  [ b [] [ text "PLACEHOLDER ROUTE" ] ]
+                    ]
+                ]
+            }
+        Unauthorized _ _ -> { title = "AUTH FAILED"
+            , body =
+                [ div [ class "main" ]
+                    [ p []  
+                    [ b [] [ text "AUTHENTICATION FAILED: " ] 
+                    , p [] [ text "The current URL is: " ]
+                    , b [] [ text (Url.toString global.url) ]
+                    , p [] [ text "The auth key: ", b [] [ text global.auth] ]
+                    , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+                    ]
+                    ]
+                ]
+            }
 
 -- old images code
 -- if List.isEmpty model.topTracks.items
@@ -148,11 +193,6 @@ topTracksToImages res =
     in
         List.map (\a -> displayImg a.url) firstArts
 -}
--- ROUTES 
-
-type Route
-  = Default String (Dict String String)
-  | Authorized String (Dict String String)
 
 splitPair : String -> (String, String)
 splitPair s =
@@ -162,6 +202,13 @@ splitPair s =
         value = Maybe.withDefault "" (Array.get 1 temp)
     in 
         (key, value)
+
+getEndpoint : String -> String
+getEndpoint s =
+    let
+        temp = Array.fromList (String.split "/" s)
+    in 
+        Maybe.withDefault "" (Array.get (Array.length temp - 1) temp)
 
 containsAuth : (Dict String String) -> Bool
 containsAuth p = Dict.member "access_token" p
@@ -175,9 +222,11 @@ urlParser url =
         paramsList =  Dict.fromList ( List.map splitPair (String.split "&" params) )
     in
         if containsAuth paramsList then
-            Authorized base paramsList
+            case getEndpoint base of
+                "edit" -> PlaylistEdit base paramsList
+                _ -> StatDisplay base paramsList
         else
-            Default base paramsList
+            Unauthorized base paramsList
 
 -- Error handling 
 htmlErrorToString : Http.Error -> String

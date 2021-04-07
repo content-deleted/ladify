@@ -14,8 +14,14 @@ type alias Global =
   , params : (Dict String String)
   , errMsg : String
   , topTracks : TopTrackResponse
+  , currentRoute : Route
   }
 
+-- ROUTES 
+type Route
+  = Unauthorized String (Dict String String)
+  | StatDisplay String (Dict String String)
+  | PlaylistEdit String (Dict String String)
 
 -- MESSAGE
 type Msg

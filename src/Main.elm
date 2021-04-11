@@ -42,7 +42,7 @@ init flags url key =
         Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) ) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
-            ++ "&redirect_uri=http%3A%2F%2Flocalhost%3A8001%2FMain.html" -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
+            ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
             ++ "&scope=user-top-read" -- this should change based on what we need, maybe user input?
             ++ "&response_type=token") )
 
@@ -203,12 +203,30 @@ splitPair s =
     in 
         (key, value)
 
+-- Used in init to pass the current url to spotify redirect api --
+urlEncode : String -> String
+urlEncode c = 
+    case c of
+       "/" -> "%2F"
+       ":" -> "%3A"
+       _ -> c
+
+getRedirectUrl : String -> String
+getRedirectUrl baseUrl = 
+    let 
+        split = String.split "" baseUrl
+        strArray = List.map urlEncode split
+    in 
+        List.foldr (++) "" strArray
+--------------------------------------------
+
 getEndpoint : String -> String
 getEndpoint s =
     let
-        temp = Array.fromList (String.split "/" s)
+        temp = String.split "/" s
+        filtered = Array.fromList (List.filter (\x -> x /= "") temp)
     in 
-        Maybe.withDefault "" (Array.get (Array.length temp - 1) temp)
+        Maybe.withDefault "" (Array.get (Array.length filtered - 1) filtered)
 
 containsAuth : (Dict String String) -> Bool
 containsAuth p = Dict.member "access_token" p

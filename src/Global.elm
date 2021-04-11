@@ -15,6 +15,7 @@ type alias Global =
   , errMsg : String
   , topTracks : TopTrackResponse
   , currentRoute : Route
+  , savedAlbums : List Album
   }
 
 -- ROUTES 
@@ -28,9 +29,10 @@ type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
   | GetTracks (Result Http.Error TopTrackResponse)
+  | GetLibraryAlbums (Result Http.Error TopAlbumsResponse)
 
 -- Decode Song Response 
-type alias TopAlbumsResponse =  { items: List Album}
+type alias TopAlbumsResponse =  { items: List SavedAlbum, next: String}
 type alias TopTrackResponse =  { items: List Track}
 
 type alias Track =
@@ -41,6 +43,11 @@ type alias Track =
   , preview_url : String
   , explicit : Bool
   }
+
+type alias SavedAlbum = 
+    { album : Album
+    , added_at : String
+    }
 type alias Album =
   { name : String
   , release_date : String
@@ -59,8 +66,15 @@ type alias SimpleArtist =
 
 topAlbumsResponseDecoder : Decoder TopAlbumsResponse
 topAlbumsResponseDecoder =
-  Json.Decode.map TopAlbumsResponse
-      (field "items" (Json.Decode.list albumsDecoder))
+  Json.Decode.map2 TopAlbumsResponse
+      (field "items" (Json.Decode.list savedAlbumDecoder))
+      (field "next" string)
+
+savedAlbumDecoder : Decoder SavedAlbum
+savedAlbumDecoder =
+  Json.Decode.map2 SavedAlbum
+      (field "album" albumsDecoder)
+      (field "added_at" string)
 
 topTrackResponseDecoder : Decoder TopTrackResponse
 topTrackResponseDecoder =

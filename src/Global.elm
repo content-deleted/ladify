@@ -16,6 +16,7 @@ type alias Global =
   , topTracks : TopTrackResponse
   , currentRoute : Route
   , savedAlbums : List Album
+  , playlistId : String
   }
 
 -- ROUTES 
@@ -30,6 +31,11 @@ type Msg
   | UrlChanged Url.Url
   | GetTracks (Result Http.Error TopTrackResponse)
   | GetLibraryAlbums (Result Http.Error TopAlbumsResponse)
+  | CreatePlaylist (Result Http.Error Playlist)
+  | SendSpotifyRequest SpotifyRequest
+
+type SpotifyRequest
+  = RequestCreatePlaylist
 
 -- Decode Song Response 
 type alias TopAlbumsResponse =  { items: List SavedAlbum, next: String}
@@ -111,3 +117,17 @@ artistDecoder =
   Json.Decode.map2 SimpleArtist
     (field "name" string)
     (field "uri" string)
+
+
+-- Playlists
+
+type alias Playlist =
+  { name : String
+  , id : String
+  }
+
+playlistDecoder : Decoder Playlist
+playlistDecoder =
+  Json.Decode.map2 Playlist
+      (field "name" string)
+      (field "id" string)

@@ -2,12 +2,13 @@ module Main exposing (..)
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (..)
+import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
 import Url
 import Array
 import Dict exposing (Dict)
 import Http
-import Json.Decode exposing (..)
+import Json.Encode exposing (..)
 import Stat exposing (..)
 import Global exposing (..)
 import List
@@ -40,7 +41,7 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) []) [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "") [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -51,7 +52,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) []) [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "") [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
@@ -65,7 +66,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) []) [], getNextAlbums token 0)
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "") [], getNextAlbums token 0)
 
 getNextAlbums : String -> Int -> Cmd Msg
 getNextAlbums token curAlbums =
@@ -75,6 +76,18 @@ getNextAlbums token curAlbums =
                 , url = "https://api.spotify.com/v1/me/albums?limit=50&offset=" ++ (String.fromInt curAlbums) -- Request All User albums (Continue until we load all)
                 , body = Http.emptyBody
                 , expect = Http.expectJson GetLibraryAlbums topAlbumsResponseDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+createNewPlaylist : String -> String -> String -> Cmd Msg
+createNewPlaylist token userid playlistName =
+    Http.request { 
+                  method = "POST"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/users/" ++ userid ++ "/playlists"
+                , body =  Http.jsonBody <| Json.Encode.object [ ("name", Json.Encode.string playlistName ), ("description", Json.Encode.string "test" ), ("public", Json.Encode.string "true") ]
+                , expect = Http.expectJson CreatePlaylist playlistDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
@@ -128,8 +141,16 @@ update msg model =
                         newAlbums = List.concat [global.savedAlbums, albums]
                         totalAlbums = List.length newAlbums
                     in
-                        ( { model | global = { global | savedAlbums = newAlbums }, stats = Stat.init } ,if continue then getNextAlbums global.auth totalAlbums else Cmd.none)
+                        ( { model | global = { global | savedAlbums = newAlbums } } ,if continue then getNextAlbums global.auth totalAlbums else Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
+        
+        CreatePlaylist res -> 
+            case res of
+                Ok playlist -> ( { model | global = { global | playlistId = playlist.id } }, Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none )
+        
+        SendSpotifyRequest req -> 
+            case req of RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth "steamymeme" "TEST_PLAYLIST")
 
 -- SUBSCRIPTIONS
 
@@ -168,7 +189,9 @@ view model =
                 [ div [ class "main" ]
                     [ -- Stat.view global stats
                     p []  [ b [] [ text "PLACEHOLDER ROUTE" ] ]
-                    , p [] [ text ("Count of albums: "  ++ String.fromInt (List.length global.savedAlbums))]
+                    , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
+                    , p [] [ text ("Playlist id: " ++ global.playlistId)]
+                    , button [ onClick (SendSpotifyRequest RequestCreatePlaylist)  ] [ text "Create New Playlist" ]
                     , p [] [ text "Error: ", b [] [ text global.errMsg] ]
                     ]
                 ]

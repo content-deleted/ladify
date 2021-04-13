@@ -5,6 +5,8 @@ import Dict exposing (Dict)
 import Json.Decode exposing (..)
 import Http exposing (Error)
 import Browser
+import Array
+
 
 -- MODEL
 type alias Global =
@@ -33,9 +35,11 @@ type Msg
   | GetLibraryAlbums (Result Http.Error TopAlbumsResponse)
   | CreatePlaylist (Result Http.Error Playlist)
   | SendSpotifyRequest SpotifyRequest
+  | ProcessAddSongsToPlaylist (Msg) (Result Http.Error ())
 
 type SpotifyRequest
   = RequestCreatePlaylist
+  | RequestAddSongsPlaylist (Array.Array String)
 
 -- Decode Song Response 
 type alias TopAlbumsResponse =  { items: List SavedAlbum, next: String}
@@ -43,12 +47,25 @@ type alias TopTrackResponse =  { items: List Track}
 
 type alias Track =
   { name : String
-  , album : Album
+  , album : SimpleAlbum
   , artists : List SimpleArtist
   , popularity : Int
   , preview_url : String
   , explicit : Bool
   }
+
+type alias SimpleTrack =
+  { name : String
+  , id : String
+  }
+
+type alias SimpleAlbum =
+  { name : String
+  , release_date : String
+  , images : List AlbumArt
+  }
+
+type alias AlbumTracksWrapper = { items : List SimpleTrack }
 
 type alias SavedAlbum = 
     { album : Album
@@ -58,6 +75,7 @@ type alias Album =
   { name : String
   , release_date : String
   , images : List AlbumArt
+  , tracks : AlbumTracksWrapper
   }
 type alias AlbumArt =
   { url : String
@@ -74,7 +92,7 @@ topAlbumsResponseDecoder : Decoder TopAlbumsResponse
 topAlbumsResponseDecoder =
   Json.Decode.map2 TopAlbumsResponse
       (field "items" (Json.Decode.list savedAlbumDecoder))
-      (field "next" string)
+      (field "next" (oneOf [ string, null "none" ]) )
 
 savedAlbumDecoder : Decoder SavedAlbum
 savedAlbumDecoder =
@@ -91,18 +109,38 @@ tracksDecoder : Decoder Track
 tracksDecoder =
   Json.Decode.map6 Track
     (field "name" string)
-    (field "album" albumsDecoder)
+    (field "album" simpleAlbumsDecoder)
     (field "artists" (Json.Decode.list artistDecoder))
     (field "popularity" int)
     (field "preview_url" (oneOf [ string, null "EMPTY" ]) )
     (field "explicit" bool)
 
-albumsDecoder : Decoder Album
-albumsDecoder =
-  Json.Decode.map3 Album
+
+simpleTracksDecoder : Decoder SimpleTrack
+simpleTracksDecoder =
+  Json.Decode.map2 SimpleTrack
+    (field "name" string)
+    (field "id" string)
+
+simpleAlbumsDecoder : Decoder SimpleAlbum
+simpleAlbumsDecoder =
+  Json.Decode.map3 SimpleAlbum
     (field "name" string)
     (field "release_date" string)
     (field "images" (Json.Decode.list albumArtDecoder))
+
+albumTracksWrapperDecoder : Decoder AlbumTracksWrapper
+albumTracksWrapperDecoder =
+  Json.Decode.map AlbumTracksWrapper
+    (field "items" (Json.Decode.list simpleTracksDecoder))
+
+albumsDecoder : Decoder Album
+albumsDecoder =
+  Json.Decode.map4 Album
+    (field "name" string)
+    (field "release_date" string)
+    (field "images" (Json.Decode.list albumArtDecoder))
+    (field "tracks" albumTracksWrapperDecoder)
 
 albumArtDecoder : Decoder AlbumArt
 albumArtDecoder = 

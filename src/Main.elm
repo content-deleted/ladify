@@ -12,6 +12,10 @@ import Json.Encode exposing (..)
 import Stat exposing (..)
 import Global exposing (..)
 import List
+import Platform exposing (Task)
+import Task
+import Process
+import Json.Decode exposing (float)
 
 -- MAIN
 
@@ -92,6 +96,17 @@ createNewPlaylist token userid playlistName =
                 , tracker = Nothing
                 }
 
+addSongsToPlaylist : String -> String -> Array.Array String  -> Cmd Msg
+addSongsToPlaylist token playlistId songsIdList =
+    Http.request {
+                  method = "POST"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/playlists/" ++ playlistId ++ "/tracks"
+                , body =  Http.jsonBody <| Json.Encode.object [ ("uris", Json.Encode.array Json.Encode.string songsIdList ) ]
+                , expect = Http.expectWhatever (ProcessAddSongsToPlaylist (SendSpotifyRequest (RequestAddSongsPlaylist songsIdList)))
+                , timeout = Nothing
+                , tracker = Nothing
+                }
 
 -- UPDATE
 
@@ -142,15 +157,56 @@ update msg model =
                         totalAlbums = List.length newAlbums
                     in
                         ( { model | global = { global | savedAlbums = newAlbums } } ,if continue then getNextAlbums global.auth totalAlbums else Cmd.none)
-                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none ) 
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
         
         CreatePlaylist res -> 
             case res of
-                Ok playlist -> ( { model | global = { global | playlistId = playlist.id } }, Cmd.none)
-                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage } , Cmd.none )
+                Ok playlist -> 
+                 let
+                     updatedModel =  { model | global = { global | playlistId = playlist.id } }
+                 in
+                    ( updatedModel, Cmd.batch (generateSongAddRequests updatedModel))
+
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none )
+
+        ProcessAddSongsToPlaylist req res ->
+            case res of
+                Ok _ -> ( model, Cmd.none)
+                Err errorMessage -> ( 
+                    updateGlobal model { global | errMsg = (htmlErrorToString errorMessage) ++ "retrying" }, 
+                    case errorMessage of
+                        Http.BadStatus x -> 
+                            case x of -- This logic retries if we have an error, its evil
+                                500 -> (delay 100 req) -- this is a genuine server error we sent like 100 requests
+                                429 -> (delay 10000 req)-- spotify is being a whore lets wait a minute and try again
+                                _ -> Cmd.none -- idk give up
+                        _ -> Cmd.none )
         
         SendSpotifyRequest req -> 
-            case req of RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth "steamymeme" "TEST_PLAYLIST")
+            case req of 
+                RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth "steamymeme" "TEST_PLAYLIST")
+                RequestAddSongsPlaylist tracks -> ( model, addSongsToPlaylist model.global.auth model.global.playlistId tracks)
+            
+
+delay : Float -> Msg -> Cmd Msg
+delay time msg =
+  Process.sleep time
+  |> Task.perform (\_ -> msg)
+
+generateSongAddRequests : Model -> List (Cmd Msg)
+generateSongAddRequests model =
+  let
+    allTracks = List.concatMap (\album -> album.tracks.items) model.global.savedAlbums
+    trackIds = Array.fromList (List.map (\t -> "spotify:track:"++t.id) allTracks)
+  in
+    requestsFromSongs trackIds model []
+
+requestsFromSongs : Array.Array String -> Model -> List (Cmd Msg) -> List (Cmd Msg)
+requestsFromSongs remainingTracks model requests =
+  let count = Array.length remainingTracks
+  in 
+    if count >= 100 then requestsFromSongs (Array.slice 99 (Array.length remainingTracks) remainingTracks) model ( (addSongsToPlaylist model.global.auth model.global.playlistId (Array.slice 0 100 remainingTracks)) :: requests)
+    else ( (addSongsToPlaylist model.global.auth model.global.playlistId remainingTracks) :: requests)
 
 -- SUBSCRIPTIONS
 

@@ -19,6 +19,7 @@ type alias Global =
   , currentRoute : Route
   , savedAlbums : List Album
   , playlistId : String
+  , currentUser : User
   }
 
 -- ROUTES 
@@ -36,6 +37,7 @@ type Msg
   | CreatePlaylist (Result Http.Error Playlist)
   | SendSpotifyRequest SpotifyRequest
   | ProcessAddSongsToPlaylist (Msg) (Result Http.Error ())
+  | GetUser (Result Http.Error User)
 
 type SpotifyRequest
   = RequestCreatePlaylist
@@ -168,4 +170,22 @@ playlistDecoder : Decoder Playlist
 playlistDecoder =
   Json.Decode.map2 Playlist
       (field "name" string)
+      (field "id" string)
+
+
+-- Users
+
+type alias User =
+  { display_name : String
+  , id : String
+  }
+
+-- Empty Initilizer 
+newUser : User
+newUser = User "" ""
+
+userDecoder : Decoder User
+userDecoder =
+  Json.Decode.map2 User
+      (field "display_name" string)
       (field "id" string)

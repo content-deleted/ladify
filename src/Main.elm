@@ -45,7 +45,7 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "") [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -56,7 +56,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "") [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
@@ -70,7 +70,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "") [], getNextAlbums token 0)
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
 
 getNextAlbums : String -> Int -> Cmd Msg
 getNextAlbums token curAlbums =
@@ -104,6 +104,18 @@ addSongsToPlaylist token playlistId songsIdList =
                 , url = "https://api.spotify.com/v1/playlists/" ++ playlistId ++ "/tracks"
                 , body =  Http.jsonBody <| Json.Encode.object [ ("uris", Json.Encode.array Json.Encode.string songsIdList ) ]
                 , expect = Http.expectWhatever (ProcessAddSongsToPlaylist (SendSpotifyRequest (RequestAddSongsPlaylist songsIdList)))
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+getUserInfo : String -> Cmd Msg
+getUserInfo token =
+    Http.request {
+                  method = "GET"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/me/"
+                , body = Http.emptyBody
+                , expect = Http.expectJson GetUser userDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
@@ -184,9 +196,13 @@ update msg model =
         
         SendSpotifyRequest req -> 
             case req of 
-                RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth "steamymeme" "TEST_PLAYLIST")
+                RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth global.currentUser.id "Full Library")
                 RequestAddSongsPlaylist tracks -> ( model, addSongsToPlaylist model.global.auth model.global.playlistId tracks)
-            
+        
+        GetUser res -> 
+            case res of
+                Ok user -> ( { model | global = { global | currentUser = user } }, Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
 
 delay : Float -> Msg -> Cmd Msg
 delay time msg =
@@ -247,7 +263,8 @@ view model =
                     p []  [ b [] [ text "PLACEHOLDER ROUTE" ] ]
                     , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
                     , p [] [ text ("Playlist id: " ++ global.playlistId)]
-                    , button [ onClick (SendSpotifyRequest RequestCreatePlaylist)  ] [ text "Create New Playlist" ]
+                    , p [] [ text ("User id: " ++ global.currentUser.id)]
+                    , if global.currentUser.id /= "" then button [ onClick (SendSpotifyRequest RequestCreatePlaylist)  ] [ text "Create New Playlist" ] else text "still loading..."
                     , p [] [ text "Error: ", b [] [ text global.errMsg] ]
                     ]
                 ]

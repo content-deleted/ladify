@@ -8,6 +8,7 @@ const sass = require('gulp-sass');
 const concat = require('gulp-concat');
 const replace = require('gulp-replace');
 const fs = require('fs');
+const rename = require('gulp-rename');
 
 const paths = {
   dest: 'dist',
@@ -15,7 +16,9 @@ const paths = {
   main: 'src/Main.elm',
   staticAssets: 'static/**/*.{html,css}',
   static: 'static',
-  scss: 'src/**/*.scss'
+  scss: 'src/**/*.scss',
+  htmlOut: 'dist/Main.html',
+  endpoints: 'dist/edit/'
 };
 
 // scss compile task
@@ -48,12 +51,18 @@ gulp.task('staticAssets', function() {
     .pipe(gulp.dest(paths.dest));
 });
 
-gulp.task('watch', function() {
-  gulp.watch(paths.elm, ['elm']);
-  gulp.watch(paths.staticAssets, ['scss', 'staticAssets']);
+gulp.task('copyEndpoints', function() {
+  return gulp.src(paths.htmlOut)
+    .pipe(rename('index.html'))
+    .pipe(gulp.dest(paths.endpoints));
 });
 
-gulp.task('build', ['scss', 'elm', 'staticAssets']);
+gulp.task('watch', function() {
+  gulp.watch(paths.elm, ['elm','copyEndpoints']);
+  gulp.watch(paths.scss, ['scss', 'staticAssets', 'elm', 'copyEndpoints']);
+});
+
+gulp.task('build', ['scss', 'elm', 'staticAssets', 'copyEndpoints']);
 gulp.task('dev', ['build', 'watch']);
 gulp.task('default', ['build']);
 

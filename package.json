@@ -7,9 +7,10 @@
     "gulp-elm": "^0.8.2",
     "gulp-open": "^3.0.1",
     "gulp-plumber": "^1.0.1",
+    "gulp-rename": "^2.0.0",
+    "gulp-replace": "^1.0.0",
     "gulp-sass": "^4.1.0",
-    "node-sass": "^4.14.1",
-    "gulp-replace": "^1.0.0"
+    "node-sass": "^4.14.1"
   },
   "scripts": {
     "dev": "gulp clean && gulp dev && gulp devHTML",

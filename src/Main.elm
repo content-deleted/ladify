@@ -16,6 +16,7 @@ import Platform exposing (Task)
 import Task
 import Process
 import Json.Decode exposing (float)
+import Markdown exposing (defaultOptions)
 
 -- MAIN
 
@@ -258,14 +259,20 @@ view model =
             }
         PlaylistEdit _ _ -> { title = "Playlist Edit"
             , body =
-                [ div [ class "main" ]
+                [ div [ class "edit" ]
                     [ -- Stat.view global stats
-                    p []  [ b [] [ text "PLACEHOLDER ROUTE" ] ]
-                    , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
-                    , p [] [ text ("Playlist id: " ++ global.playlistId)]
-                    , p [] [ text ("User id: " ++ global.currentUser.id)]
-                    , if global.currentUser.id /= "" then button [ onClick (SendSpotifyRequest RequestCreatePlaylist)  ] [ text "Create New Playlist" ] else text "still loading..."
-                    , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+                    div [ class "center-panel" ]
+                        [
+                        b [class "edit-title" ] [ text "Library Playlist Generator" ]
+                        , div [ class "playlist-embed"] [ displayPlaylist global.playlistId ]
+                        , if global.currentUser.id /= "" then button [ onClick (SendSpotifyRequest RequestCreatePlaylist), class "btn" ] [ text "Create New Playlist" ] else text "still loading..."
+                        , div [ class "debug" ]
+                            [ p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
+                            , p [] [ text ("Playlist id: " ++ global.playlistId)]
+                            , p [] [ text ("User id: " ++ global.currentUser.id)]
+                            , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+                            ]
+                        ]
                     ]
                 ]
             }
@@ -283,31 +290,19 @@ view model =
                 ]
             }
 
--- old images code
--- if List.isEmpty model.topTracks.items
--- then text "NOT LOADED"
--- else ul [] (topTracksToImages model.topTracks)
+displayPlaylist : String ->Html Msg
+displayPlaylist playlistId =
+    let
+        display = playlistId /= ""
+    in
+        if display then ( Markdown.toHtmlWith { defaultOptions | sanitize = False }
+                            []
+                            ("""<iframe src="https://open.spotify.com/embed/playlist/""" ++ playlistId ++ """" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>""") )
+        else text ""
 
 viewLink : String -> Html Msg
 viewLink path =
   li [] [ a [ href path ] [ text path ] ]
-
--- IDK WHY THIS ISNT WORKING
-{-
-topAlbumsToImages : TopAlbumsResponse -> List (Html Msg)
-topAlbumsToImages res =
-    let
-        firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.images) ) res.items 
-    in
-        List.map (\a -> displayImg a.url) firstArts
-
-topTracksToImages : TopTrackResponse -> List (Html Msg)
-topTracksToImages res =
-    let
-        firstArts = List.map (\x -> Maybe.withDefault (AlbumArt "") (List.head x.album.images) ) res.items 
-    in
-        List.map (\a -> displayImg a.url) firstArts
--}
 
 splitPair : String -> (String, String)
 splitPair s =

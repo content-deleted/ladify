@@ -264,10 +264,14 @@ view model =
                     div [ class "center-panel" ]
                         [
                         b [class "edit-title" ] [ text "Library Playlist Generator" ]
+                        , div [ class "edit-description" ] 
+                            [ p [] [ text "This tool was created to allow users to shuffle their entire library from a single source. Currently it will automatically pull all of a user saved albums and add them to one playlist, but support for consolidation of liked songs and user playlists is planned for a future release." ]
+                            ]
                         , div [ class "playlist-embed"] [ displayPlaylist global.playlistId ]
                         , if global.currentUser.id /= "" then button [ onClick (SendSpotifyRequest RequestCreatePlaylist), class "btn" ] [ text "Create New Playlist" ] else text "still loading..."
                         , div [ class "debug" ]
-                            [ p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
+                            [ b [] [ text "DEBUG" ]
+                            , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
                             , p [] [ text ("Playlist id: " ++ global.playlistId)]
                             , p [] [ text ("User id: " ++ global.currentUser.id)]
                             , p [] [ text "Error: ", b [] [ text global.errMsg] ]
@@ -296,9 +300,9 @@ displayPlaylist playlistId =
         display = playlistId /= ""
     in
         if display then ( Markdown.toHtmlWith { defaultOptions | sanitize = False }
-                            []
+                            [class "playlist-border"]
                             ("""<iframe src="https://open.spotify.com/embed/playlist/""" ++ playlistId ++ """" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>""") )
-        else text ""
+        else div [class "playlist-border"] []
 
 viewLink : String -> Html Msg
 viewLink path =

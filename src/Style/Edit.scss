@@ -4,7 +4,7 @@
     color: black;
 
     // background properties
-    background-color: #122f12;
+    background-color: #266626;;
     height: 100%;
 
     .center-panel {
@@ -14,19 +14,46 @@
         margin-right: auto;
         margin-left: auto;
         min-height: 100rem; // 100vh;
-        box-shadow: -10px 0px 100px black, 10px 0px 100px black;
+        box-shadow: -200px 0px 1000px #0d0d0d7d, 200px -0px 1000px #0d0d0d7d;
         flex-direction: column;
 
         .edit-title {
             justify-content: center;
             display: flex;
-            font-size: x-large;
+            font-weight: 900;
+            letter-spacing: -.02em;
+            font-size: 48px;
+            line-height: 1.2;
+            margin: 1rem;
+        }
+
+        .edit-description {
+            justify-content: center;
+            display: flex;
+            p {
+                line-height: 1.5;
+                font-size: large;
+                text-align: center;
+                max-width: 50%;
+            }
         }
         
         .playlist-embed {
             display: flex;
             justify-content: center;
+            justify-self: center;
             margin: 1rem;
+            
+            .playlist-border {
+                max-width: 300px;
+                max-height: 380px;
+                min-width: 300px;
+                min-height: 380px;
+                background-image: linear-gradient(180deg, #eae9e9, #0e550e);
+                border: black;
+                border-width: 3px;
+                border-style: solid;
+            }
         }
 
         .btn {
@@ -53,11 +80,15 @@
             // Custom
             margin-right: 25%;
             margin-left: 25%;
-            //margin-top: 10rem;
+            margin-top: 2rem;
         }
-
-        .debug {
- 
+        .btn:hover {
+            background-color: #1ed760;
+        }
+        
+        // This is just at the bottom for some reason, I guess it could be hidden
+        .debug { 
+            margin-top: 30rem;
         }
     }
 }

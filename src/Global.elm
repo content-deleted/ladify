@@ -20,7 +20,20 @@ type alias Global =
   , savedAlbums : List Album
   , playlistId : String
   , currentUser : User
+  , dataSources : DataSources
   }
+
+-- This will be used for a checkbox interface to let users select which sources should be used for generating a Library playlist
+-- userPlaylist source should ignore playlist of our naming convention probably, but we dont add duplicates so its not really a problem either way, just stupid
+type alias DataSources =
+ { savedAlbums : Bool
+ , savedArtists : Bool
+ , userPlaylists : Bool
+ , likedSongs : Bool
+ }
+
+newDataSources : DataSources
+newDataSources = DataSources False False False False
 
 -- ROUTES 
 type Route

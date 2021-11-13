@@ -46,7 +46,7 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser) [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser Global.newDataSources) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -57,7 +57,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser) [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser Global.newDataSources) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
@@ -71,7 +71,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser Global.newDataSources) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
 
 getNextAlbums : String -> Int -> Cmd Msg
 getNextAlbums token curAlbums =

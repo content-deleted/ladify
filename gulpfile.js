@@ -18,7 +18,7 @@ const paths = {
   static: 'static',
   scss: 'src/**/*.scss',
   htmlOut: 'dist/Main.html',
-  endpoints: 'dist/edit/'
+  endpoints: ['dist/edit/', 'dist/playlist-stats/']
 };
 
 // scss compile task
@@ -52,9 +52,12 @@ gulp.task('staticAssets', function() {
 });
 
 gulp.task('copyEndpoints', function() {
-  return gulp.src(paths.htmlOut)
-    .pipe(rename('index.html'))
-    .pipe(gulp.dest(paths.endpoints));
+  var p = gulp.src(paths.htmlOut)
+    .pipe(rename('index.html'));
+  
+  paths.endpoints.forEach(d => p.pipe(gulp.dest(d)));
+
+  return p;
 });
 
 gulp.task('watch', function() {

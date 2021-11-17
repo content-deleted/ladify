@@ -1,0 +1,91 @@
+
+.playlist-stats {
+    font: 1em Rubik;
+    color: black;
+
+    // background properties
+    background-color: #266626;;
+    height: 100%;
+
+    .center-panel {
+        background-color: #cecece;
+        display: flex;
+        max-width: 66%;
+        margin-right: auto;
+        margin-left: auto;
+        min-height: 100rem; // 100vh;
+        box-shadow: -200px 0px 1000px #0d0d0d7d, 200px -0px 1000px #0d0d0d7d;
+        flex-direction: column;
+
+        .edit-title {
+            justify-content: center;
+            display: flex;
+            font-weight: 900;
+            letter-spacing: -.02em;
+            font-size: 48px;
+            line-height: 1.2;
+            margin: 1rem;
+        }
+
+        .edit-description {
+            justify-content: center;
+            display: flex;
+            p {
+                line-height: 1.5;
+                font-size: large;
+                text-align: center;
+                max-width: 50%;
+            }
+        }
+
+        .source-container {
+            justify-content: center;
+            display: flex;
+
+            .source-select {
+                border:2px solid #000;
+                width: 30rem;
+                height: 40rem;
+                overflow-y: scroll;
+                white-space: nowrap;
+                padding: 0.5rem;
+                font-size: 1.5rem;
+            }
+        }
+
+        .btn {
+            font-size: 14px;
+            line-height: 1;
+            border-radius: 500px;
+            padding: 18px 48px 16px;
+            transition-property: background-color,border-color,color,box-shadow,filter;
+            transition-duration: .3s;
+            border-width: 0;
+            letter-spacing: 2px;
+            min-width: 160px;
+            text-transform: uppercase;
+            white-space: normal;
+
+            display: inline-block;
+            margin-bottom: 0;
+            font-weight: 700;
+            text-align: center;
+            vertical-align: middle;
+            touch-action: manipulation;
+            cursor: pointer;
+
+            // Custom
+            margin-right: 25%;
+            margin-left: 25%;
+            margin-top: 2rem;
+        }
+        .btn:hover {
+            background-color: #1ed760;
+        }
+        
+        // This is just at the bottom for some reason, I guess it could be hidden
+        .debug { 
+            margin-top: 30rem;
+        }
+    }
+}

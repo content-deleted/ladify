@@ -21,6 +21,7 @@ type alias Global =
   , playlistId : String
   , currentUser : User
   , dataSources : DataSources
+  , savedPlaylists : List PlaylistSource
   }
 
 -- This will be used for a checkbox interface to let users select which sources should be used for generating a Library playlist
@@ -40,6 +41,7 @@ type Route
   = Unauthorized String (Dict String String)
   | StatDisplay String (Dict String String)
   | PlaylistEdit String (Dict String String)
+  | PlaylistInfo String (Dict String String)
 
 -- MESSAGE
 type Msg
@@ -51,6 +53,8 @@ type Msg
   | SendSpotifyRequest SpotifyRequest
   | ProcessAddSongsToPlaylist (Msg) (Result Http.Error ())
   | GetUser (Result Http.Error User)
+  | TogglePlaylistStat String
+  | GetUserPlaylists (Result Http.Error UserPlaylistsResponse)
 
 type SpotifyRequest
   = RequestCreatePlaylist
@@ -102,6 +106,17 @@ type alias SimpleArtist =
   { name : String
   , uri : String
   }
+
+type alias UserPlaylistsResponse =  { items: List Playlist, next: String}
+
+-- This type is used for toggling what 
+type alias PlaylistSource = { playlist: Playlist, enabled: Bool, tracks: List Track }
+
+userPlaylistsResponseDecoder : Decoder UserPlaylistsResponse
+userPlaylistsResponseDecoder =
+  Json.Decode.map2 UserPlaylistsResponse
+    (field "items" (Json.Decode.list playlistDecoder))
+    (field "next" (oneOf [ string, null "none" ]) )
 
 topAlbumsResponseDecoder : Decoder TopAlbumsResponse
 topAlbumsResponseDecoder =

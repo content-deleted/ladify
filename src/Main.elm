@@ -46,7 +46,7 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser Global.newDataSources) [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -57,7 +57,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser Global.newDataSources) [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
@@ -71,7 +71,13 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser Global.newDataSources) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
+        
+        PlaylistInfo baseUrl params -> 
+            let
+                token = Maybe.withDefault "" (Dict.get "access_token" params)
+            in
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistInfo baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Cmd.batch [(getNextPlaylists token 0), (getUserInfo token)])
 
 getNextAlbums : String -> Int -> Cmd Msg
 getNextAlbums token curAlbums =
@@ -81,6 +87,18 @@ getNextAlbums token curAlbums =
                 , url = "https://api.spotify.com/v1/me/albums?limit=50&offset=" ++ (String.fromInt curAlbums) -- Request All User albums (Continue until we load all)
                 , body = Http.emptyBody
                 , expect = Http.expectJson GetLibraryAlbums topAlbumsResponseDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+getNextPlaylists : String -> Int -> Cmd Msg
+getNextPlaylists token curPlaylists =
+    Http.request { 
+                  method = "GET"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/me/playlists?limit=50&offset=" ++ (String.fromInt curPlaylists) -- Request All User albums (Continue until we load all)
+                , body = Http.emptyBody
+                , expect = Http.expectJson GetUserPlaylists userPlaylistsResponseDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
@@ -155,6 +173,13 @@ update msg model =
                         currentRoute = (PlaylistEdit baseUrl params)
                     }, Cmd.none )
 
+                PlaylistInfo baseUrl params -> ( updateGlobal model { global |
+                        url = url, 
+                        params = params, 
+                        auth = Maybe.withDefault "" (Dict.get "access_token" params),
+                        currentRoute = (PlaylistInfo baseUrl params)
+                    }, Cmd.none )
+
         GetTracks res -> 
             case res of
                     Ok topTracks -> ( { model | global = { global | topTracks = topTracks }, stats = Stat.init } , Cmd.none)
@@ -195,7 +220,7 @@ update msg model =
                                 _ -> Cmd.none -- idk give up
                         _ -> Cmd.none )
         
-        SendSpotifyRequest req -> 
+        SendSpotifyRequest req ->
             case req of 
                 RequestCreatePlaylist ->  ( model, createNewPlaylist global.auth global.currentUser.id "Full Library")
                 RequestAddSongsPlaylist tracks -> ( model, addSongsToPlaylist model.global.auth model.global.playlistId tracks)
@@ -204,6 +229,27 @@ update msg model =
             case res of
                 Ok user -> ( { model | global = { global | currentUser = user } }, Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
+
+        -- This needs to write the playlist to a dictionary of playlists
+        -- The dic should be String : { Tracks | Null }
+        TogglePlaylistStat playlistId -> 
+            let 
+                newPlaylists = List.map (\p -> if p.playlist.id == playlistId then {p | enabled = not p.enabled} else p) global.savedPlaylists
+            in
+                ( { model | global = { global | savedPlaylists = newPlaylists } } , Cmd.none)
+
+        GetUserPlaylists res -> 
+            case res of
+                Ok playlistsResponse -> 
+                    let 
+                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, tracks = []}) playlistsResponse.items
+                        continue = playlistsResponse.next /= "none"
+                        newPlaylists = List.concat [global.savedPlaylists, userPlaylists]
+                        totalPlaylists = List.length newPlaylists
+                    in
+                        ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextPlaylists global.auth totalPlaylists else Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
+
 
 delay : Float -> Msg -> Cmd Msg
 delay time msg =
@@ -280,6 +326,31 @@ view model =
                     ]
                 ]
             }
+        PlaylistInfo _ _ -> { title = "Playlist Stats"
+            , body =
+                [ div [ class "playlist-stats" ]
+                    [ -- Stat.view global stats
+                    div [ class "center-panel" ]
+                        [
+                        b [class "edit-title" ] [ text "User Playlist Stats" ]
+                        , div [ class "edit-description" ] 
+                            [ p [] [ text "Work in progress to display a users playlists" ]
+                            ]
+                        --, div [ class "playlist-embed"] [ displayPlaylist global.playlistId ]
+                        , div [ class "source-container"] 
+                            [ if global.savedPlaylists /= [] then displayAvailablePlaylists global.savedPlaylists else text "still loading..."
+                            ]
+                        , div [ class "debug" ]
+                            [ b [] [ text "DEBUG" ]
+                            , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]
+                            , p [] [ text ("Playlist id: " ++ global.playlistId)]
+                            , p [] [ text ("User id: " ++ global.currentUser.id)]
+                            , p [] [ text "Error: ", b [] [ text global.errMsg] ]
+                            ]
+                        ]
+                    ]
+                ]
+            }
         Unauthorized _ _ -> { title = "AUTH FAILED"
             , body =
                 [ div [ class "main" ]
@@ -304,6 +375,19 @@ displayPlaylist playlistId =
                             ("""<iframe src="https://open.spotify.com/embed/playlist/""" ++ playlistId ++ """" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>""") )
         else div [class "playlist-border"] []
 
+displayAvailablePlaylists : List PlaylistSource -> Html Msg
+displayAvailablePlaylists availablePlaylists =
+    ul [class "source-select"] (List.map (\x -> (checkbox (TogglePlaylistStat x.playlist.id) x.playlist.name)) availablePlaylists)
+
+checkbox : Msg -> String -> Html Msg
+checkbox fn name =
+    label
+        [ style "padding-right" "10px" ]
+        [ input [ type_ "checkbox", onClick fn ] []
+        , text name
+        , br [] []
+        ]
+
 viewLink : String -> Html Msg
 viewLink path =
   li [] [ a [ href path ] [ text path ] ]
@@ -323,6 +407,7 @@ urlEncode c =
     case c of
        "/" -> "%2F"
        ":" -> "%3A"
+       "-" -> "%2D"
        _ -> c
 
 getRedirectUrl : String -> String
@@ -356,6 +441,7 @@ urlParser url =
         if containsAuth paramsList then
             case getEndpoint base of
                 "edit" -> PlaylistEdit base paramsList
+                "playlist-stats" -> PlaylistInfo base paramsList
                 _ -> StatDisplay base paramsList
         else
             Unauthorized base paramsList

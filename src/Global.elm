@@ -108,12 +108,17 @@ type alias SimpleArtist =
   , uri : String
   }
 
+type alias AddedBy =
+  { id : String
+  , href : String
+  }
 type alias UserPlaylistsResponse =  { items: List Playlist, next: String}
 
-type alias PlaylistItemsResponse = { items: List Track, next: String}
+type alias PlaylistItemsResponse = { items: List PlaylistTrack, next: String}
 
 -- This type is used for toggling what 
-type alias PlaylistSource = { playlist: Playlist, enabled: Bool, loaded: Bool, tracks: List Track }
+type alias PlaylistSource = { playlist: Playlist, enabled: Bool, loaded: Bool, items: List PlaylistTrack }
+type alias PlaylistTrack =  { track: Track, addedBy: AddedBy }
 
 userPlaylistsResponseDecoder : Decoder UserPlaylistsResponse
 userPlaylistsResponseDecoder =
@@ -124,8 +129,20 @@ userPlaylistsResponseDecoder =
 playlistItemsResponseDecoder : Decoder PlaylistItemsResponse
 playlistItemsResponseDecoder =
   Json.Decode.map2 PlaylistItemsResponse
-    (field "items" (Json.Decode.list tracksDecoder))
+    (field "items" (Json.Decode.list playlistTrackDecoder))
     (field "next" (oneOf [ string, null "none" ]) )
+
+playlistTrackDecoder : Decoder PlaylistTrack
+playlistTrackDecoder =
+  Json.Decode.map2 PlaylistTrack
+    (field "track" tracksDecoder)
+    (field "added_by" addedByDecoder)
+
+addedByDecoder : Decoder AddedBy
+addedByDecoder =
+  Json.Decode.map2 AddedBy
+    (field "id" string)
+    (field "href" string)
 
 topAlbumsResponseDecoder : Decoder TopAlbumsResponse
 topAlbumsResponseDecoder =

@@ -248,7 +248,7 @@ update msg model =
             let 
                 newPlaylists = List.map (\p -> if p.playlist.id == playlistId then {p | enabled = not p.enabled} else p) global.savedPlaylists
                 curPlaylist = getPlaylistById global.savedPlaylists playlistId
-                loadPlaylist = (List.length curPlaylist.tracks) == 0
+                loadPlaylist = (List.length curPlaylist.items) == 0
             in
                 ( { model | global = { global | savedPlaylists = newPlaylists } } , if loadPlaylist then getNextTracksFromPlaylist global.auth curPlaylist 0  else Cmd.none)
 
@@ -258,9 +258,9 @@ update msg model =
                     let 
                         tracks = playlistsResponse.items
                         continue = playlistsResponse.next /= "none"
-                        newTracks = List.concat [playlist.tracks, tracks]
+                        newTracks = List.concat [playlist.items, tracks]
                         totalTracks = List.length newTracks
-                        newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | tracks = newTracks} else p) global.savedPlaylists
+                        newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | items = newTracks} else p) global.savedPlaylists
                     in
                         ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextTracksFromPlaylist global.auth playlist totalTracks else Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
@@ -269,7 +269,7 @@ update msg model =
             case res of
                 Ok playlistsResponse -> 
                     let 
-                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, loaded = False, tracks = []}) playlistsResponse.items
+                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, loaded = False, items = []}) playlistsResponse.items
                         continue = playlistsResponse.next /= "none"
                         newPlaylists = List.concat [global.savedPlaylists, userPlaylists]
                         totalPlaylists = List.length newPlaylists
@@ -287,7 +287,7 @@ getPlaylistById : List PlaylistSource -> String -> PlaylistSource
 getPlaylistById playlists id =
   let
     curPlaylist = List.filter (\p -> p.playlist.id == id) playlists
-    playlist = Maybe.withDefault {enabled = False, loaded = False, playlist = {id = "", name = ""}, tracks = []} (List.head curPlaylist)
+    playlist = Maybe.withDefault {enabled = False, loaded = False, playlist = {id = "", name = ""}, items = []} (List.head curPlaylist)
   in
     playlist
 

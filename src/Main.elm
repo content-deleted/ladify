@@ -17,6 +17,7 @@ import Task
 import Process
 import Json.Decode exposing (float)
 import Markdown exposing (defaultOptions)
+import PlaylistStatBlocks exposing (..)
 
 -- MAIN
 
@@ -99,6 +100,18 @@ getNextPlaylists token curPlaylists =
                 , url = "https://api.spotify.com/v1/me/playlists?limit=50&offset=" ++ (String.fromInt curPlaylists) -- Request All User albums (Continue until we load all)
                 , body = Http.emptyBody
                 , expect = Http.expectJson GetUserPlaylists userPlaylistsResponseDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+getNextTracksFromPlaylist : String -> PlaylistSource -> Int -> Cmd Msg
+getNextTracksFromPlaylist token playlist curPlaylists =
+    Http.request { 
+                  method = "GET"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/playlists/"++ playlist.playlist.id++"/tracks?limit=50&offset=" ++ (String.fromInt curPlaylists) -- Request All User albums (Continue until we load all)
+                , body = Http.emptyBody
+                , expect = Http.expectJson (GetPlaylistTracks playlist) playlistItemsResponseDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
@@ -230,19 +243,33 @@ update msg model =
                 Ok user -> ( { model | global = { global | currentUser = user } }, Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
 
-        -- This needs to write the playlist to a dictionary of playlists
-        -- The dic should be String : { Tracks | Null }
+        -- Update playist with enabled and also start loading the playlist}
         TogglePlaylistStat playlistId -> 
             let 
                 newPlaylists = List.map (\p -> if p.playlist.id == playlistId then {p | enabled = not p.enabled} else p) global.savedPlaylists
+                curPlaylist = getPlaylistById global.savedPlaylists playlistId
+                loadPlaylist = (List.length curPlaylist.tracks) == 0
             in
-                ( { model | global = { global | savedPlaylists = newPlaylists } } , Cmd.none)
+                ( { model | global = { global | savedPlaylists = newPlaylists } } , if loadPlaylist then getNextTracksFromPlaylist global.auth curPlaylist 0  else Cmd.none)
 
+        GetPlaylistTracks playlist res -> 
+            case res of
+                Ok playlistsResponse -> 
+                    let 
+                        tracks = playlistsResponse.items
+                        continue = playlistsResponse.next /= "none"
+                        newTracks = List.concat [playlist.tracks, tracks]
+                        totalTracks = List.length newTracks
+                        newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | tracks = newTracks} else p) global.savedPlaylists
+                    in
+                        ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextTracksFromPlaylist global.auth playlist totalTracks else Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
+        
         GetUserPlaylists res -> 
             case res of
                 Ok playlistsResponse -> 
                     let 
-                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, tracks = []}) playlistsResponse.items
+                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, loaded = False, tracks = []}) playlistsResponse.items
                         continue = playlistsResponse.next /= "none"
                         newPlaylists = List.concat [global.savedPlaylists, userPlaylists]
                         totalPlaylists = List.length newPlaylists
@@ -255,6 +282,14 @@ delay : Float -> Msg -> Cmd Msg
 delay time msg =
   Process.sleep time
   |> Task.perform (\_ -> msg)
+
+getPlaylistById : List PlaylistSource -> String -> PlaylistSource
+getPlaylistById playlists id =
+  let
+    curPlaylist = List.filter (\p -> p.playlist.id == id) playlists
+    playlist = Maybe.withDefault {enabled = False, loaded = False, playlist = {id = "", name = ""}, tracks = []} (List.head curPlaylist)
+  in
+    playlist
 
 generateSongAddRequests : Model -> List (Cmd Msg)
 generateSongAddRequests model =
@@ -340,6 +375,7 @@ view model =
                         , div [ class "source-container"] 
                             [ if global.savedPlaylists /= [] then displayAvailablePlaylists global.savedPlaylists else text "still loading..."
                             ]
+                        , PlaylistStatBlocks.view global
                         , div [ class "debug" ]
                             [ b [] [ text "DEBUG" ]
                             , p [] [ text ("Count of albums: " ++ String.fromInt (List.length global.savedAlbums))]

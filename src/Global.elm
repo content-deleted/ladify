@@ -55,6 +55,7 @@ type Msg
   | GetUser (Result Http.Error User)
   | TogglePlaylistStat String
   | GetUserPlaylists (Result Http.Error UserPlaylistsResponse)
+  | GetPlaylistTracks PlaylistSource (Result Http.Error PlaylistItemsResponse)
 
 type SpotifyRequest
   = RequestCreatePlaylist
@@ -109,13 +110,21 @@ type alias SimpleArtist =
 
 type alias UserPlaylistsResponse =  { items: List Playlist, next: String}
 
+type alias PlaylistItemsResponse = { items: List Track, next: String}
+
 -- This type is used for toggling what 
-type alias PlaylistSource = { playlist: Playlist, enabled: Bool, tracks: List Track }
+type alias PlaylistSource = { playlist: Playlist, enabled: Bool, loaded: Bool, tracks: List Track }
 
 userPlaylistsResponseDecoder : Decoder UserPlaylistsResponse
 userPlaylistsResponseDecoder =
   Json.Decode.map2 UserPlaylistsResponse
     (field "items" (Json.Decode.list playlistDecoder))
+    (field "next" (oneOf [ string, null "none" ]) )
+
+playlistItemsResponseDecoder : Decoder PlaylistItemsResponse
+playlistItemsResponseDecoder =
+  Json.Decode.map2 PlaylistItemsResponse
+    (field "items" (Json.Decode.list tracksDecoder))
     (field "next" (oneOf [ string, null "none" ]) )
 
 topAlbumsResponseDecoder : Decoder TopAlbumsResponse

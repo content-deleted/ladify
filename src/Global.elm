@@ -122,6 +122,8 @@ type alias SimpleArtist =
   , id : String
   }
 
+newArtist : Artist
+newArtist = Artist "" "" "" [] [] {total=0}
 type alias Artist =
   { name : String
   , id : String
@@ -288,3 +290,16 @@ userDecoder =
   Json.Decode.map2 User
       (field "display_name" string)
       (field "id" string)
+
+-- Helpers 
+
+uniqueList : List a -> List a
+uniqueList l = 
+    let
+        incUnique : a -> List a -> List a
+        incUnique elem lst = 
+            case List.member elem lst of
+                True -> lst
+                False -> elem :: lst
+    in
+        List.foldr incUnique [] l

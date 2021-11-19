@@ -332,17 +332,6 @@ delay time msg =
   Process.sleep time
   |> Task.perform (\_ -> msg)
 
-uniqueList : List a -> List a
-uniqueList l = 
-    let
-        incUnique : a -> List a -> List a
-        incUnique elem lst = 
-            case List.member elem lst of
-                True -> lst
-                False -> elem :: lst
-    in
-        List.foldr incUnique [] l
-
 getPlaylistById : List PlaylistSource -> String -> PlaylistSource
 getPlaylistById playlists id =
   let

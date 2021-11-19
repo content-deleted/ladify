@@ -22,6 +22,8 @@ type alias Global =
   , currentUser : User
   , dataSources : DataSources
   , savedPlaylists : List PlaylistSource
+  , albumIndex : Dict.Dict String Album
+  , artistIndex : Dict.Dict String Artist
   }
 
 -- This will be used for a checkbox interface to let users select which sources should be used for generating a Library playlist
@@ -56,6 +58,8 @@ type Msg
   | TogglePlaylistStat String
   | GetUserPlaylists (Result Http.Error UserPlaylistsResponse)
   | GetPlaylistTracks PlaylistSource (Result Http.Error PlaylistItemsResponse)
+  | WriteAlbumIndex (Result Http.Error Album)
+  | WriteArtistIndex (Result Http.Error Artist)
 
 type SpotifyRequest
   = RequestCreatePlaylist
@@ -84,9 +88,10 @@ type alias SimpleTrack =
   }
 
 newSimpleAlbum : SimpleAlbum
-newSimpleAlbum = SimpleAlbum "" "" []
+newSimpleAlbum = SimpleAlbum "" "" "" []
 type alias SimpleAlbum =
-  { name : String
+  { id : String
+  , name : String
   , release_date : String
   , images : List AlbumArt
   }
@@ -99,6 +104,8 @@ type alias SavedAlbum =
     }
 type alias Album =
   { name : String
+  , id : String
+  , genres : List String
   , release_date : String
   , images : List AlbumArt
   , tracks : AlbumTracksWrapper
@@ -112,7 +119,19 @@ type alias AlbumArt =
 type alias SimpleArtist =
   { name : String
   , uri : String
+  , id : String
   }
+
+type alias Artist =
+  { name : String
+  , id : String
+  , uri : String
+  , genres : List String
+  , images : List AlbumArt
+  , followers : ArtistFollowers
+  }
+
+type alias ArtistFollowers = { total : Int }
 
 type alias AddedBy =
   { id : String
@@ -173,7 +192,7 @@ tracksDecoder =
     (field "name" string)
     (field "id" string)
     (field "album" simpleAlbumsDecoder)
-    (field "artists" (Json.Decode.list artistDecoder))
+    (field "artists" (Json.Decode.list simpleArtistDecoder))
     (field "popularity" int)
     (field "preview_url" (oneOf [ string, null "EMPTY" ]) )
     (field "explicit" bool)
@@ -187,7 +206,8 @@ simpleTracksDecoder =
 
 simpleAlbumsDecoder : Decoder SimpleAlbum
 simpleAlbumsDecoder =
-  Json.Decode.map3 SimpleAlbum
+  Json.Decode.map4 SimpleAlbum
+    (field "id" string)
     (field "name" string)
     (field "release_date" string)
     (field "images" (Json.Decode.list albumArtDecoder))
@@ -199,11 +219,28 @@ albumTracksWrapperDecoder =
 
 albumsDecoder : Decoder Album
 albumsDecoder =
-  Json.Decode.map4 Album
+  Json.Decode.map6 Album
     (field "name" string)
+    (field "id" string)
+    (field "genres" (Json.Decode.list string))
     (field "release_date" string)
     (field "images" (Json.Decode.list albumArtDecoder))
     (field "tracks" albumTracksWrapperDecoder)
+
+artistDecoder : Decoder Artist
+artistDecoder =
+  Json.Decode.map6 Artist
+    (field "name" string)
+    (field "uri" string)
+    (field "id" string)
+    (field "genres" (Json.Decode.list string))
+    (field "images" (Json.Decode.list albumArtDecoder))
+    (field "followers" artistFollowersDecoder)
+
+artistFollowersDecoder : Decoder ArtistFollowers
+artistFollowersDecoder = 
+  Json.Decode.map ArtistFollowers
+    (field "total" int)
 
 albumArtDecoder : Decoder AlbumArt
 albumArtDecoder = 
@@ -213,11 +250,12 @@ albumArtDecoder =
       (field "height" int)
 
 
-artistDecoder : Decoder SimpleArtist
-artistDecoder =
-  Json.Decode.map2 SimpleArtist
+simpleArtistDecoder : Decoder SimpleArtist
+simpleArtistDecoder =
+  Json.Decode.map3 SimpleArtist
     (field "name" string)
     (field "uri" string)
+    (field "id" string)
 
 
 -- Playlists

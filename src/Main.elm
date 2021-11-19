@@ -18,6 +18,7 @@ import Process
 import Json.Decode exposing (float)
 import Markdown exposing (defaultOptions)
 import PlaylistStatBlocks exposing (..)
+import Array exposing (empty)
 
 -- MAIN
 
@@ -47,7 +48,7 @@ updateGlobal model global = { model | global = global }
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     case urlParser url of
-        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Nav.load
+        Unauthorized  baseUrl params -> ( Model (Global.Global key url "" params "" (TopTrackResponse []) (Unauthorized baseUrl params) [] "" Global.newUser Global.newDataSources [] Dict.empty Dict.empty) [], Nav.load
             ("https://accounts.spotify.com/authorize"
             ++ "?client_id=c6494c8623bc4dde928588fc20354bd4" -- consider not doing this
             ++ "&redirect_uri=" ++ (getRedirectUrl baseUrl)  -- http%3A%2F%2Flocalhost%3A8000%2Fsrc%2FMain.elm" -- may be smarter to have a specific endpoint 
@@ -58,7 +59,7 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Http.request { 
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (StatDisplay baseUrl params) [] "" Global.newUser Global.newDataSources [] Dict.empty Dict.empty) [], Http.request { 
                       method = "GET"
                     , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
                     , url = "https://api.spotify.com/v1/me/top/tracks/?time_range=long_term&limit=50"
@@ -72,13 +73,13 @@ init flags url key =
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistEdit baseUrl params) [] "" Global.newUser Global.newDataSources [] Dict.empty Dict.empty) [] , Cmd.batch [(getNextAlbums token 0), (getUserInfo token)])
         
         PlaylistInfo baseUrl params -> 
             let
                 token = Maybe.withDefault "" (Dict.get "access_token" params)
             in
-                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistInfo baseUrl params) [] "" Global.newUser Global.newDataSources []) [], Cmd.batch [(getNextPlaylists token 0), (getUserInfo token)])
+                ( Model (Global.Global key url token params "" (TopTrackResponse []) (PlaylistInfo baseUrl params) [] "" Global.newUser Global.newDataSources [] Dict.empty Dict.empty) [], Cmd.batch [(getNextPlaylists token 0), (getUserInfo token)])
 
 getNextAlbums : String -> Int -> Cmd Msg
 getNextAlbums token curAlbums =
@@ -88,6 +89,30 @@ getNextAlbums token curAlbums =
                 , url = "https://api.spotify.com/v1/me/albums?limit=50&offset=" ++ (String.fromInt curAlbums) -- Request All User albums (Continue until we load all)
                 , body = Http.emptyBody
                 , expect = Http.expectJson GetLibraryAlbums topAlbumsResponseDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+getSingleAlbum : String -> String -> Cmd Msg
+getSingleAlbum token albumId =
+    Http.request { 
+                  method = "GET"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/albums/" ++ (albumId)
+                , body = Http.emptyBody
+                , expect = Http.expectJson WriteAlbumIndex albumsDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+getSingleArtist : String -> String -> Cmd Msg
+getSingleArtist token artistId =
+    Http.request { 
+                  method = "GET"
+                , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+                , url = "https://api.spotify.com/v1/artists/" ++ (artistId)
+                , body = Http.emptyBody
+                , expect = Http.expectJson WriteArtistIndex artistDecoder
                 , timeout = Nothing
                 , tracker = Nothing
                 }
@@ -262,10 +287,15 @@ update msg model =
                         totalTracks = List.length newTracks
                         newPlaylist = {playlist | items = newTracks}
                         newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | items = newTracks, loaded = (not continue)} else p) global.savedPlaylists
+                        nextTracksRequest = (if continue then getNextTracksFromPlaylist global.auth newPlaylist totalTracks else Cmd.none)
+                        uniqueAlbumIds = uniqueList (List.map (\track -> track.track.album.id) newPlaylist.items)
+                        allArtists = List.concatMap (\track -> track.track.artists) newPlaylist.items
+                        uniqueArtistIds = uniqueList (List.map (\artist -> artist.id) allArtists)
+                        commands = nextTracksRequest :: (generateAlbumRequests global uniqueAlbumIds) ++ (generateArtistRequests global uniqueArtistIds)
                     in
-                        ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextTracksFromPlaylist global.auth newPlaylist totalTracks else Cmd.none)
+                        ( { model | global = { global | savedPlaylists = newPlaylists } }, Cmd.batch commands)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
-        
+
         GetUserPlaylists res -> 
             case res of
                 Ok playlistsResponse -> 
@@ -278,11 +308,40 @@ update msg model =
                         ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextPlaylists global.auth totalPlaylists else Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
 
+        WriteAlbumIndex res -> 
+            case res of
+                Ok album -> 
+                    let 
+                        newIndex = Dict.insert album.id album global.albumIndex
+                    in
+                        ( { model | global = { global | albumIndex = newIndex } }, Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
+        
+        WriteArtistIndex res -> 
+            case res of
+                Ok artist -> 
+                    let 
+                        newIndex = Dict.insert artist.id artist global.artistIndex
+                    in
+                        ( { model | global = { global | artistIndex = newIndex } }, Cmd.none)
+                Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
+
 
 delay : Float -> Msg -> Cmd Msg
 delay time msg =
   Process.sleep time
   |> Task.perform (\_ -> msg)
+
+uniqueList : List a -> List a
+uniqueList l = 
+    let
+        incUnique : a -> List a -> List a
+        incUnique elem lst = 
+            case List.member elem lst of
+                True -> lst
+                False -> elem :: lst
+    in
+        List.foldr incUnique [] l
 
 getPlaylistById : List PlaylistSource -> String -> PlaylistSource
 getPlaylistById playlists id =
@@ -299,6 +358,20 @@ generateSongAddRequests model =
     trackIds = Array.fromList (List.map (\t -> "spotify:track:"++t.id) allTracks)
   in
     requestsFromSongs trackIds model []
+
+generateAlbumRequests : Global -> List String -> List (Cmd Msg)
+generateAlbumRequests  global albumIds =
+  let
+    newAlbumIds = List.filter (\album -> not (Dict.member album global.albumIndex)) albumIds
+  in
+    List.map ( \id -> getSingleAlbum global.auth id ) newAlbumIds
+
+generateArtistRequests : Global -> List String -> List (Cmd Msg)
+generateArtistRequests  global artistIds =
+  let
+    newArtistIds = List.filter (\artist -> not (Dict.member artist global.artistIndex)) artistIds
+  in
+    List.map ( \id -> getSingleArtist global.auth id ) newArtistIds
 
 requestsFromSongs : Array.Array String -> Model -> List (Cmd Msg) -> List (Cmd Msg)
 requestsFromSongs remainingTracks model requests =

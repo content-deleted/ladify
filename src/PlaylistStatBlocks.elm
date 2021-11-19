@@ -32,6 +32,7 @@ view global =
             div [ class "playlist-stat-block" ] [ 
                 ul [] [text ("Selected playlists: "++String.fromInt(List.length selectedPlaylists))],
                 ul [] [text ("Songs Per Playlist:"), div[] (List.map (\x -> div[] [text ( x.playlist.name ++  ": " ++String.fromInt (List.length x.items) ), br [] []]) selectedPlaylists)],
+                -- ul [] (text "Heres some genres" :: List.map (\x -> text ((List.foldl (\a b -> a ++ b) "" (Tuple.second x).genres) ++ (Tuple.first x) ++ " ") ) (Dict.toList global.artistIndex)),
                 topCommonSongs selectedPlaylists
                 -- THIS PRINTS ALL SONGS: ul [] (List.map (\x -> div[] [text ("Id: " ++ x.track.id ++ " name: " ++ x.track.name), br [] []]) allTracks)
             ]
@@ -80,7 +81,7 @@ listArtists : String -> List SimpleArtist -> String
 listArtists previous artists =
   let
     base = if previous == "" then "" else previous ++ " and "
-    artist = Maybe.withDefault (SimpleArtist "" "") (List.head artists)
+    artist = Maybe.withDefault (SimpleArtist "" "" "") (List.head artists)
     remaining = Maybe.withDefault [] (List.tail artists)
   in
     if List.length artists == 0

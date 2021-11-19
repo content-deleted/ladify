@@ -64,9 +64,13 @@ type SpotifyRequest
 -- Decode Song Response 
 type alias TopAlbumsResponse =  { items: List SavedAlbum, next: String}
 type alias TopTrackResponse =  { items: List Track}
+ 
+newTrack : Track
+newTrack = Track "" "" newSimpleAlbum [] 0 "" False
 
 type alias Track =
   { name : String
+  , id : String
   , album : SimpleAlbum
   , artists : List SimpleArtist
   , popularity : Int
@@ -79,6 +83,8 @@ type alias SimpleTrack =
   , id : String
   }
 
+newSimpleAlbum : SimpleAlbum
+newSimpleAlbum = SimpleAlbum "" "" []
 type alias SimpleAlbum =
   { name : String
   , release_date : String
@@ -163,8 +169,9 @@ topTrackResponseDecoder =
 
 tracksDecoder : Decoder Track
 tracksDecoder =
-  Json.Decode.map6 Track
+  Json.Decode.map7 Track
     (field "name" string)
+    (field "id" string)
     (field "album" simpleAlbumsDecoder)
     (field "artists" (Json.Decode.list artistDecoder))
     (field "popularity" int)

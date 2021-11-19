@@ -97,7 +97,7 @@ getNextPlaylists token curPlaylists =
     Http.request { 
                   method = "GET"
                 , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                , url = "https://api.spotify.com/v1/me/playlists?limit=50&offset=" ++ (String.fromInt curPlaylists) -- Request All User albums (Continue until we load all)
+                , url = "https://api.spotify.com/v1/me/playlists?limit=50&offset=" ++ (String.fromInt curPlaylists)
                 , body = Http.emptyBody
                 , expect = Http.expectJson GetUserPlaylists userPlaylistsResponseDecoder
                 , timeout = Nothing
@@ -109,7 +109,7 @@ getNextTracksFromPlaylist token playlist curPlaylists =
     Http.request { 
                   method = "GET"
                 , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
-                , url = "https://api.spotify.com/v1/playlists/"++ playlist.playlist.id++"/tracks?limit=50&offset=" ++ (String.fromInt curPlaylists) -- Request All User albums (Continue until we load all)
+                , url = "https://api.spotify.com/v1/playlists/"++ playlist.playlist.id++"/tracks?limit=50&offset=" ++ (String.fromInt curPlaylists)
                 , body = Http.emptyBody
                 , expect = Http.expectJson (GetPlaylistTracks playlist) playlistItemsResponseDecoder
                 , timeout = Nothing
@@ -260,17 +260,18 @@ update msg model =
                         continue = playlistsResponse.next /= "none"
                         newTracks = List.concat [playlist.items, tracks]
                         totalTracks = List.length newTracks
-                        newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | items = newTracks} else p) global.savedPlaylists
+                        newPlaylist = {playlist | items = newTracks}
+                        newPlaylists = List.map (\p -> if p.playlist.id == playlist.playlist.id then {p | items = newTracks, loaded = (not continue)} else p) global.savedPlaylists
                     in
-                        ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextTracksFromPlaylist global.auth playlist totalTracks else Cmd.none)
+                        ( { model | global = { global | savedPlaylists = newPlaylists } } ,if continue then getNextTracksFromPlaylist global.auth newPlaylist totalTracks else Cmd.none)
                 Err errorMessage -> ( updateGlobal model { global | errMsg = htmlErrorToString errorMessage }, Cmd.none)
         
         GetUserPlaylists res -> 
             case res of
                 Ok playlistsResponse -> 
                     let 
-                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, loaded = False, items = []}) playlistsResponse.items
                         continue = playlistsResponse.next /= "none"
+                        userPlaylists = List.map (\p -> { playlist = p, enabled = False, loaded = False, items = []}) playlistsResponse.items
                         newPlaylists = List.concat [global.savedPlaylists, userPlaylists]
                         totalPlaylists = List.length newPlaylists
                     in

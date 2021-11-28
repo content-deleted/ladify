@@ -99,11 +99,16 @@ topCommonArtists global selectedPlaylists =
         stupidFlippedTuples = List.map (\x -> (Tuple.second x, Tuple.first x)) countList
         sortedCount = Array.fromList ( List.reverse (List.sort stupidFlippedTuples))
         topTen =  Array.slice 0 10 sortedCount
-        topTenArtists = Array.map (\x -> {count = Tuple.first x, artistInfo = Maybe.withDefault newArtist (Dict.get (Tuple.second x) global.artistIndex)}) topTen
+        topTenArtists = Array.map (\x -> {count = Tuple.first x, artistInfo = Maybe.withDefault newArtist (Dict.get ("spotify:artist:" ++ (Tuple.second x)) global.artistIndex)}) topTen
         selectedCount = String.fromInt(List.length selectedPlaylists)
         render = if singlePlaylist then renderTopArtistSingle else renderTopArtist
     in
-        ul [class "top-common-songs"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenArtists))
+        -- text (String.fromInt (Dict.size global.artistIndex))
+        --ul [] [
+        --  ul [] (List.map (\x -> text (Tuple.first x)) (Dict.toList global.artistIndex)),
+        --  ul [] (Array.toList (Array.map (\x -> text (" " ++ Tuple.second x)) topTen))
+        --]
+       ul [class "top-common-artists"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenArtists))
 
 countTopIds : Array.Array String -> Dict.Dict String Int -> Dict.Dict String Int
 countTopIds remainingIds idCounts =
@@ -120,11 +125,11 @@ countTopIds remainingIds idCounts =
 
 renderTopArtist : {count : Int, artistInfo : Artist} -> Int -> String -> Global -> Html msg
 renderTopArtist artist rank selectedCount global =
-  div [] [text ( (String.fromInt rank) ++ ". " ++ artist.artistInfo.name ++ " (" ++ String.fromInt artist.count ++ "/"++ selectedCount ++")")
+  div [] [text ( (String.fromInt (rank + 1)) ++ ". " ++ artist.artistInfo.name ++ " (" ++ String.fromInt artist.count ++ "/"++ selectedCount ++")")
   , br [] []]
 
 renderTopArtistSingle : {count : Int, artistInfo : Artist} -> Int -> String -> Global -> Html msg
 renderTopArtistSingle artist rank selectedCount global =
-  div [] [text ( (String.fromInt rank) ++ ". " ++ artist.artistInfo.name ++ " ("++ selectedCount ++ ")")
+  div [] [text ( (String.fromInt (rank + 1)) ++ ". " ++ artist.artistInfo.name ++ " ("++ String.fromInt artist.count ++ ")")
   , br [] []]
 

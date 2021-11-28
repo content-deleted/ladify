@@ -9,6 +9,7 @@ import Dict exposing (Dict)
 import Array exposing (Array)
 import Json.Decode exposing (array)
 import List exposing (sort)
+import Bitwise exposing (or)
 
 
 {-| Im not sure what Im doing anymore
@@ -32,6 +33,7 @@ view global =
           then 
             div [ class "playlist-stat-block" ] [ 
               renderStatBlock "Top Artists" "These are the artists that appear most frequently in the playlist you selected, and how many songs by those artists are in your playlist" (topCommonArtists global selectedPlaylists),
+              renderStatBlock "Top Genres" "These are the genres most represented in your playlist, along with how many songs belong to that genre (note that spotify bases genre off of artists rather than individual songs)" (topCommonGenres global selectedPlaylists True),
               br [] [],
               text "Select more than one playlist to see comparative stats..."
             ]
@@ -45,7 +47,9 @@ view global =
                     ul [] [text ("Songs Per Playlist:"), div[] (List.map (\x -> div[] [text ( x.playlist.name ++  ": " ++String.fromInt (List.length x.items) ), br [] []]) selectedPlaylists)],
                     -- ul [] (text "Heres some genres" :: List.map (\x -> text ((List.foldl (\a b -> a ++ b) "" (Tuple.second x).genres) ++ (Tuple.first x) ++ " ") ) (Dict.toList global.artistIndex)),
                     renderStatBlock "Top Common Arists" "These are the artists your playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonArtists global selectedPlaylists),
-                    renderStatBlock "Top Common Songs" "These are the songs your playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonSongs selectedPlaylists)
+                    renderStatBlock "Top Common Songs" "These are the songs your playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonSongs selectedPlaylists),
+                    renderStatBlock "Top Common Genres" "These are the genres that your selected playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonGenres global selectedPlaylists False),
+                    renderStatBlock "Top Genres" "These are the genres most often seen on tracks in your playlists, along with how many tracks belong to that genre" (topCommonGenres global selectedPlaylists True)
                     -- THIS PRINTS ALL SONGS: ul [] (List.map (\x -> div[] [text ("Id: " ++ x.track.id ++ " name: " ++ x.track.name), br [] []]) allTracks)
                 ]
 
@@ -89,6 +93,19 @@ listArtists previous artists =
       else
         listArtists (base ++ artist.name) remaining
 
+countTopIds : Array.Array String -> Dict.Dict String Int -> Dict.Dict String Int
+countTopIds remainingIds idCounts =
+  if Array.length remainingIds == 0
+    then
+      idCounts
+    else
+      let
+        curId = Maybe.withDefault "" (Array.get ((Array.length remainingIds) - 1) remainingIds)
+        prevCount = Maybe.withDefault 0 (Dict.get curId idCounts)
+        newIdCounts = Dict.insert curId (prevCount+1) idCounts
+      in
+        countTopIds (Array.slice 0 -1 remainingIds) newIdCounts
+
 topCommonArtists : Global -> List PlaylistSource -> Html msg
 topCommonArtists global selectedPlaylists = 
     let
@@ -115,19 +132,6 @@ topCommonArtists global selectedPlaylists =
         --]
         ul [class "top-common-artists"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenArtists))
 
-countTopIds : Array.Array String -> Dict.Dict String Int -> Dict.Dict String Int
-countTopIds remainingIds idCounts =
-  if Array.length remainingIds == 0
-    then
-      idCounts
-    else
-      let
-        curId = Maybe.withDefault "" (Array.get ((Array.length remainingIds) - 1) remainingIds)
-        prevCount = Maybe.withDefault 0 (Dict.get curId idCounts)
-        newIdCounts = Dict.insert curId (prevCount+1) idCounts
-      in
-        countTopIds (Array.slice 0 -1 remainingIds) newIdCounts
-
 renderTopArtist : {count : Int, artistInfo : Artist} -> Int -> String -> Global -> Html msg
 renderTopArtist artist rank selectedCount global =
   div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ artist.artistInfo.name ++ " (" ++ String.fromInt artist.count ++ "/"++ selectedCount ++")")
@@ -137,6 +141,38 @@ renderTopArtistSingle : {count : Int, artistInfo : Artist} -> Int -> String -> G
 renderTopArtistSingle artist rank selectedCount global =
   div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ artist.artistInfo.name ++ " ("++ String.fromInt artist.count ++ ")")
   , br [] []]
+
+topCommonGenres : Global -> List PlaylistSource -> Bool -> Html msg
+topCommonGenres global selectedPlaylists notUnique = 
+    let
+        singlePlaylist = notUnique || (List.length selectedPlaylists == 1)
+        artistsOfPlaylists = List.map(\playlist -> List.concatMap (\track -> track.track.artists) playlist.items) selectedPlaylists
+        genresOfPlaylists = List.map (\artistList -> List.concatMap (\artist -> (Maybe.withDefault newArtist (Dict.get ("spotify:artist:" ++ artist.id) global.artistIndex)).genres) artistList) artistsOfPlaylists
+        uniqueGenresOfPlaylists = List.map (\artists -> (uniqueList artists)) genresOfPlaylists
+        flatGenreList = List.concat ( if singlePlaylist then genresOfPlaylists else uniqueGenresOfPlaylists )
+        emptyCountDict: Dict.Dict String Int
+        emptyCountDict = Dict.empty
+        countDict = countTopIds (Array.fromList flatGenreList) emptyCountDict
+        countList = Dict.toList countDict
+        stupidFlippedTuples = List.map (\x -> (Tuple.second x, Tuple.first x)) countList
+        sortedCount = Array.fromList ( List.reverse (List.sort stupidFlippedTuples))
+        topTen =  Array.slice 0 10 sortedCount
+        topTenGenres = Array.map (\x -> {count = Tuple.first x, genre = Tuple.second x}) topTen
+        selectedCount = String.fromInt(List.length selectedPlaylists)
+        render = if singlePlaylist then renderTopGenreSingle else renderTopGenre
+    in
+        ul [class "top-common-artists"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenGenres))
+
+renderTopGenre : {count : Int, genre : String} -> Int -> String -> Global -> Html msg
+renderTopGenre genreInfo rank selectedCount global =
+  div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " (" ++ String.fromInt genreInfo.count ++ "/"++ selectedCount ++")")
+  , br [] []]
+
+renderTopGenreSingle : {count : Int, genre : String} -> Int -> String -> Global -> Html msg
+renderTopGenreSingle genreInfo rank selectedCount global =
+  div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " ("++ String.fromInt genreInfo.count ++ ")")
+  , br [] []]
+
 
 renderStatBlock: String -> String -> Html msg -> Html msg
 renderStatBlock title description mainElement =

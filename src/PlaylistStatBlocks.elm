@@ -43,13 +43,14 @@ view global =
                 text "Loading playlist info..."
               else
                 div [ class "playlist-stat-block" ] [ 
-                    ul [] [text ("Selected playlists: "++String.fromInt(List.length selectedPlaylists))],
-                    ul [] [text ("Songs Per Playlist:"), div[] (List.map (\x -> div[] [text ( x.playlist.name ++  ": " ++String.fromInt (List.length x.items) ), br [] []]) selectedPlaylists)],
+                   -- ul [] [text ("Selected playlists: "++String.fromInt(List.length selectedPlaylists))],
+                   -- ul [] [text ("Songs Per Playlist:"), div[] (List.map (\x -> div[] [text ( x.playlist.name ++  ": " ++String.fromInt (List.length x.items) ), br [] []]) selectedPlaylists)],
                     -- ul [] (text "Heres some genres" :: List.map (\x -> text ((List.foldl (\a b -> a ++ b) "" (Tuple.second x).genres) ++ (Tuple.first x) ++ " ") ) (Dict.toList global.artistIndex)),
                     renderStatBlock "Top Common Arists" "These are the artists your playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonArtists global selectedPlaylists),
                     renderStatBlock "Top Common Songs" "These are the songs your playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonSongs selectedPlaylists),
                     renderStatBlock "Top Common Genres" "These are the genres that your selected playlists most often have in common, along with the number of playlists they appear in out of those you selected" (topCommonGenres global selectedPlaylists False),
-                    renderStatBlock "Top Genres" "These are the genres most often seen on tracks in your playlists, along with how many tracks belong to that genre" (topCommonGenres global selectedPlaylists True)
+                    renderStatBlock "Top Genres" "These are the genres most often seen on tracks in your playlists, along with how many tracks belong to that genre" (topCommonGenres global selectedPlaylists True),
+                    renderStatBlock "Unique Songs" ("These are the songs that appear in the first playlist you selected ("++ (Maybe.withDefault newPlaylistSource (List.head selectedPlaylists)).playlist.name ++") but not in any others") (uniqueSongs selectedPlaylists)
                     -- THIS PRINTS ALL SONGS: ul [] (List.map (\x -> div[] [text ("Id: " ++ x.track.id ++ " name: " ++ x.track.name), br [] []]) allTracks)
                 ]
 
@@ -173,6 +174,22 @@ renderTopGenreSingle genreInfo rank selectedCount global =
   div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " ("++ String.fromInt genreInfo.count ++ ")")
   , br [] []]
 
+uniqueSongs : List PlaylistSource -> Html msg
+uniqueSongs selectedPlaylists = 
+    let
+        allPlaylistTracks = List.map (\p -> List.map (\x -> x.track) p.items) selectedPlaylists
+        --trackDict = listToDict .id allTracksBasic
+        allTrackIds = List.map (\p -> List.map (\t -> t.id) p) allPlaylistTracks
+        songsFromFirstPlaylist = Maybe.withDefault [] (List.head allPlaylistTracks)
+        otherTracks = List.concat ( Maybe.withDefault []  (List.tail allTrackIds))
+        unique = List.filter (\s -> not (List.any (\o -> o == s.id) otherTracks)) songsFromFirstPlaylist
+    in
+        ul [class "top-common-songs"] (List.map renderUniqueSong unique)
+
+renderUniqueSong : Track -> Html msg
+renderUniqueSong song =
+  div [class "top-ten-list-item"] [text (song.name ++ " by " ++ (listArtists "" song.artists) ++ " off of " ++ song.album.name)
+  , br [] []]
 
 renderStatBlock: String -> String -> Html msg -> Html msg
 renderStatBlock title description mainElement =

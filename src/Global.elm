@@ -145,6 +145,8 @@ type alias PlaylistItemsResponse = { items: List PlaylistTrack, next: String}
 
 -- This type is used for toggling what 
 type alias PlaylistSource = { playlist: Playlist, enabled: Bool, loaded: Bool, items: List PlaylistTrack }
+newPlaylistSource : PlaylistSource
+newPlaylistSource = PlaylistSource newPlaylist False False []
 type alias PlaylistTrack =  { track: Track, addedBy: AddedBy }
 
 userPlaylistsResponseDecoder : Decoder UserPlaylistsResponse
@@ -266,6 +268,8 @@ type alias Playlist =
   { name : String
   , id : String
   }
+newPlaylist : Playlist
+newPlaylist = Playlist "" ""
 
 playlistDecoder : Decoder Playlist
 playlistDecoder =

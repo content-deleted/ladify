@@ -476,7 +476,11 @@ displayPlaylist playlistId =
 
 displayAvailablePlaylists : List PlaylistSource -> Html Msg
 displayAvailablePlaylists availablePlaylists =
-    ul [class "source-select"] (List.map (\x -> (checkbox (TogglePlaylistStat x.playlist.id) x.playlist.name)) availablePlaylists)
+    let
+        selectedPlaylists = List.filter (\x -> x.enabled) availablePlaylists
+        notAllPlaylistsLoaded = List.any (\x -> not x.loaded) selectedPlaylists
+    in
+        ul [class (if notAllPlaylistsLoaded then "source-select-dark" else "source-select")] (List.map (\x -> (checkbox (TogglePlaylistStat x.playlist.id) x.playlist.name)) availablePlaylists)
 
 checkbox : Msg -> String -> Html Msg
 checkbox fn name =

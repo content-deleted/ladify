@@ -54,6 +54,23 @@
                 padding: 0.5rem;
                 font-size: 1.5rem;
             }
+
+            .source-select-dark {
+                border: 5px solid #828282;
+                border-radius: 25px;
+                width: 30rem;
+                height: 40rem;
+                overflow-y: scroll;
+                white-space: nowrap;
+                padding: 0.5rem;
+                font-size: 1.5rem;
+
+                filter:alpha(opacity=35); /* IE */
+                opacity: 0.35; /* Safari, Opera */
+                -moz-opacity:0.35; /* FireFox */
+
+                pointer-events: none
+            }
             
             input{
                 background-color: #828282;

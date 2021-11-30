@@ -148,7 +148,9 @@ topCommonGenres global selectedPlaylists notUnique =
     let
         singlePlaylist = notUnique || (List.length selectedPlaylists == 1)
         artistsOfPlaylists = List.map(\playlist -> List.concatMap (\track -> track.track.artists) playlist.items) selectedPlaylists
-        genresOfPlaylists = List.map (\artistList -> List.concatMap (\artist -> (Maybe.withDefault newArtist (Dict.get ("spotify:artist:" ++ artist.id) global.artistIndex)).genres) artistList) artistsOfPlaylists
+        genreAristsOfPlaylists = List.map (\artistList -> List.concatMap (\artist -> List.map (\genre -> {genre= genre, artist= artist}) (Maybe.withDefault newArtist (Dict.get ("spotify:artist:" ++ artist.id) global.artistIndex)).genres) artistList) artistsOfPlaylists
+        flatGAP = List.concat genreAristsOfPlaylists
+        genresOfPlaylists = List.map (\list -> List.map (\x -> x.genre) list ) genreAristsOfPlaylists
         uniqueGenresOfPlaylists = List.map (\artists -> (uniqueList artists)) genresOfPlaylists
         flatGenreList = List.concat ( if singlePlaylist then genresOfPlaylists else uniqueGenresOfPlaylists )
         emptyCountDict: Dict.Dict String Int
@@ -159,20 +161,28 @@ topCommonGenres global selectedPlaylists notUnique =
         sortedCount = Array.fromList ( List.reverse (List.sort stupidFlippedTuples))
         topTen =  Array.slice 0 10 sortedCount
         topTenGenres = Array.map (\x -> {count = Tuple.first x, genre = Tuple.second x}) topTen
+        --This is used for tooltip
+        topTenGenresWithTooltip = Array.map (\item -> {genre = item.genre, count = item.count, artists = List.map (\x -> x.artist.name) (List.filter (\x -> x.genre == item.genre) flatGAP)}) topTenGenres
         selectedCount = String.fromInt(List.length selectedPlaylists)
         render = if singlePlaylist then renderTopGenreSingle else renderTopGenre
     in
-        ul [class "top-common-artists"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenGenres))
+        ul [class "top-common-artists"] (Array.toList (Array.indexedMap (\i x -> (render x i selectedCount global)) topTenGenresWithTooltip))
 
-renderTopGenre : {count : Int, genre : String} -> Int -> String -> Global -> Html msg
+renderTopGenre : {count : Int, genre : String, artists : List String} -> Int -> String -> Global -> Html msg
 renderTopGenre genreInfo rank selectedCount global =
-  div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " (" ++ String.fromInt genreInfo.count ++ "/"++ selectedCount ++")")
-  , br [] []]
+  div [class "top-ten-list-item"] [
+      text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " (" ++ String.fromInt genreInfo.count ++ "/"++ selectedCount ++")"),
+      span [class "tooltiptext"] [ text ("From artists: " ++ List.foldl (\a b -> a ++", " ++ b) "" genreInfo.artists)],
+      br [] []
+    ]
 
-renderTopGenreSingle : {count : Int, genre : String} -> Int -> String -> Global -> Html msg
+renderTopGenreSingle : {count : Int, genre : String, artists : List String} -> Int -> String -> Global -> Html msg
 renderTopGenreSingle genreInfo rank selectedCount global =
-  div [class "top-ten-list-item"] [text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " ("++ String.fromInt genreInfo.count ++ ")")
-  , br [] []]
+  div [class "top-ten-list-item"] [
+      text ( (String.fromInt (rank + 1)) ++ ". " ++ genreInfo.genre ++ " ("++ String.fromInt genreInfo.count ++ ")"),
+      span [class "tooltiptext"] [ text ("From artists: " ++ List.foldl (\a b -> a ++", " ++ b) "" genreInfo.artists)],
+      br [] []
+    ]
 
 uniqueSongs : List PlaylistSource -> Html msg
 uniqueSongs selectedPlaylists = 
